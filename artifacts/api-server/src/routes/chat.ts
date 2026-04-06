@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import {
   getOrCreateSession,
   addMessageToSession,
+  updateSystemMessage,
   type Message,
 } from "../lib/session-store.js";
 import { getWidgetConfig } from "../lib/widget-config-store.js";
@@ -17,6 +18,115 @@ function getOpenAIClient(): OpenAI | null {
     return null;
   }
   return new OpenAI({ baseURL, apiKey });
+}
+
+/**
+ * Format a pageContext object into a clear, structured text block that the AI
+ * can use to answer product questions accurately. Returns an empty string if
+ * no meaningful context is present.
+ */
+function formatPageContext(ctx: Record<string, unknown>): string {
+  if (!ctx || typeof ctx !== "object") return "";
+
+  const lines: string[] = [];
+  const pageType = (ctx.pageType as string) || "unknown";
+  const shopName = ctx.shopName as string | undefined;
+  const currency = (ctx.currency as string) || "";
+
+  if (shopName) lines.push(`Store: ${shopName}`);
+  lines.push(`Page Type: ${pageType}`);
+  if (ctx.pageUrl) lines.push(`Page URL: ${ctx.pageUrl}`);
+
+  if (pageType === "product" && ctx.product && typeof ctx.product === "object") {
+    const p = ctx.product as Record<string, unknown>;
+    lines.push("");
+    lines.push("## Product Being Viewed");
+    if (p.title)          lines.push(`Name: ${p.title}`);
+    if (p.vendor)         lines.push(`Brand: ${p.vendor}`);
+    if (p.type)           lines.push(`Category: ${p.type}`);
+    if (p.price)          lines.push(`Price: ${p.price} ${currency}`.trim());
+    if (p.compareAtPrice) lines.push(`Original Price: ${p.compareAtPrice} ${currency}`.trim());
+    if (p.available !== undefined) lines.push(`In Stock: ${p.available ? "Yes" : "No — currently sold out"}`);
+    if (p.description)    lines.push(`Description: ${p.description}`);
+
+    const variants = p.variantDetails as Array<Record<string, unknown>> | undefined;
+    if (variants && variants.length > 0) {
+      lines.push(`\nVariants (${variants.length} total):`);
+      variants.slice(0, 12).forEach((v) => {
+        const avail = v.available ? "available" : "sold out";
+        const sku   = v.sku ? ` — SKU: ${v.sku}` : "";
+        lines.push(`  • ${v.title}: ${v.price} ${currency} (${avail})${sku}`.trim());
+      });
+    }
+
+    if (p.tags && Array.isArray(p.tags) && (p.tags as unknown[]).length > 0) {
+      lines.push(`Tags: ${(p.tags as string[]).join(", ")}`);
+    }
+    if (ctx.collectionTitle) lines.push(`Collection: ${ctx.collectionTitle}`);
+    if (ctx.collectionHandle) lines.push(`Collection Handle: ${ctx.collectionHandle}`);
+  }
+
+  if (pageType === "collection" && ctx.collection && typeof ctx.collection === "object") {
+    const c = ctx.collection as Record<string, unknown>;
+    lines.push("");
+    lines.push("## Collection Being Viewed");
+    if (c.title)          lines.push(`Name: ${c.title}`);
+    if (c.description)    lines.push(`Description: ${c.description}`);
+    if (c.productsCount)  lines.push(`Total products: ${c.productsCount}`);
+
+    const products = c.products as Array<Record<string, unknown>> | undefined;
+    if (products && products.length > 0) {
+      lines.push(`\nProducts in collection (showing ${products.length}):`);
+      products.forEach((p) => {
+        const avail = p.available ? "" : " — sold out";
+        lines.push(`  • ${p.title}: ${p.price} ${currency}${avail}`.trim());
+      });
+    }
+  }
+
+  if (pageType === "cart" && ctx.cart && typeof ctx.cart === "object") {
+    const cart = ctx.cart as Record<string, unknown>;
+    lines.push("");
+    lines.push("## Shopper's Current Cart");
+    if (cart.itemCount)  lines.push(`Items: ${cart.itemCount}`);
+    if (cart.totalPrice) lines.push(`Total: ${cart.totalPrice}`);
+
+    const items = cart.items as Array<Record<string, unknown>> | undefined;
+    if (items && items.length > 0) {
+      lines.push("Cart contents:");
+      items.forEach((item) => {
+        const variant = item.variantTitle && item.variantTitle !== "Default Title"
+          ? ` (${item.variantTitle})` : "";
+        lines.push(`  • ${item.title}${variant} ×${item.quantity} — ${item.linePrice}`);
+      });
+    }
+  }
+
+  if (pageType === "search") {
+    if (ctx.searchTerm)        lines.push(`\nSearch Term: ${ctx.searchTerm}`);
+    if (ctx.searchResultCount) lines.push(`Results Found: ${ctx.searchResultCount}`);
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * Build the full system prompt: persona + formatted page context.
+ * This is rebuilt on every request so the AI always sees the current page.
+ */
+function buildSystemPrompt(persona: string, pageContext?: Record<string, unknown>): string {
+  if (!pageContext) return persona;
+  const contextBlock = formatPageContext(pageContext);
+  if (!contextBlock) return persona;
+  return [
+    persona,
+    "",
+    "---",
+    "**Current Store Page Context** (use this to give accurate, relevant answers):",
+    contextBlock,
+    "",
+    "Always use the above context when answering questions about products, prices, availability, or the cart. Do not ask the shopper for information you already have from the context.",
+  ].join("\n");
 }
 
 router.post("/chat", async (req: Request, res: Response): Promise<void> => {
@@ -44,13 +154,16 @@ router.post("/chat", async (req: Request, res: Response): Promise<void> => {
   const config = getWidgetConfig(shop);
   const session = getOrCreateSession(sessionId, shop);
 
+  /* Build system prompt with the latest page context from the current request.
+     Updating on every message (not just the first) ensures the AI gets
+     fresh product/collection data if the shopper navigates between pages. */
+  const systemContent = buildSystemPrompt(config.persona, pageContext || undefined);
+
   if (session.messages.length === 0) {
-    let systemPrompt = config.persona;
-    if (pageContext) {
-      systemPrompt += `\n\nCurrent page context:\n${JSON.stringify(pageContext, null, 2)}`;
-    }
-    const systemMsg: Message = { role: "system", content: systemPrompt };
+    const systemMsg: Message = { role: "system", content: systemContent };
     addMessageToSession(sessionId, shop, systemMsg);
+  } else {
+    updateSystemMessage(sessionId, shop, systemContent);
   }
 
   const userMsg: Message = { role: "user", content: message.trim() };

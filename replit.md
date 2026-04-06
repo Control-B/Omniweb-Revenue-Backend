@@ -28,12 +28,31 @@ The API server (`artifacts/api-server/`) is extended with these endpoints:
 | `GET /api/conversations/:shopId` | Recent chat sessions |
 
 **Key files:**
-- `artifacts/api-server/src/lib/session-store.ts` — in-memory conversation history
+- `artifacts/api-server/src/lib/session-store.ts` — in-memory conversation history (supports context updates mid-session)
 - `artifacts/api-server/src/lib/widget-config-store.ts` — per-shop widget config (default + overrides)
 - `artifacts/api-server/src/middleware/api-key.ts` — API key validation middleware
-- `artifacts/api-server/src/routes/chat.ts` — OpenAI chat endpoint
+- `artifacts/api-server/src/routes/chat.ts` — OpenAI chat endpoint with `buildSystemPrompt` + `formatPageContext`
 - `artifacts/api-server/src/routes/voice.ts` — ElevenLabs voice endpoint (stub if no key)
 - `artifacts/api-server/src/routes/widget-config.ts` — config + conversations endpoints
+- `artifacts/api-server/src/routes/widget.ts` — serves `dist/widget.js` (open CORS, no auth)
+
+## Embeddable Widget
+
+- `artifacts/api-server/src/widget/omniweb-widget.js` — browser IIFE source (~11kb minified)
+- Bundled via esbuild (`platform: browser, format: iife`) → `dist/widget.js`
+- Shadow DOM UI, sessionStorage session ID, voice playback (Web Audio API), mute toggle
+- Merchant install: one `<script>` tag with `data-api-url`, `data-api-key`, `data-shop-id`
+- Reads `window.__owContext` on every message send for live page context
+
+## Shopify Product Context Integration
+
+- `omniweb-revenue-theme/snippets/ai-widget.liquid` — drop-in snippet that:
+  1. Writes `window.__owContext` with full product/collection/cart data from Liquid globals
+  2. Loads the widget `<script>` (conditional on theme settings)
+- Theme.liquid calls `{% render 'ai-widget' %}` to include it
+- Chat backend (`/api/chat`) formats pageContext into a structured system-prompt block
+- Context is updated on every message, so AI stays current when the shopper navigates
+- No Admin API needed — all data from Shopify storefront Liquid globals
 
 **Env vars needed:**
 - `AI_INTEGRATIONS_OPENAI_BASE_URL` + `AI_INTEGRATIONS_OPENAI_API_KEY` — set automatically via Replit AI integrations

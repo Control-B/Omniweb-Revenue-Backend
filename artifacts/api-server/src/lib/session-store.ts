@@ -52,6 +52,19 @@ export function getOrCreateSession(sessionId: string, shopId: string): Session {
   return session;
 }
 
+export function updateSystemMessage(sessionId: string, shopId: string, content: string): void {
+  const key = tenantKey(shopId, sessionId);
+  const session = sessions.get(key);
+  if (!session) return;
+  const sysMsg = session.messages.find((m) => m.role === "system");
+  if (sysMsg) {
+    sysMsg.content = content;
+  } else {
+    session.messages.unshift({ role: "system", content });
+  }
+  session.lastActiveAt = new Date();
+}
+
 export function addMessageToSession(sessionId: string, shopId: string, message: Message): void {
   const key = tenantKey(shopId, sessionId);
   const session = sessions.get(key);

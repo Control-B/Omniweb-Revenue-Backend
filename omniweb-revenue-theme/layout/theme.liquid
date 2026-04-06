@@ -49,26 +49,7 @@
 
   {{ 'theme.js' | asset_url | script_tag }}
 
-  {% comment %}
-    Omniweb AI Sales Widget
-    Configure in Theme Editor → Theme Settings → AI Sales Widget.
-    Set your API URL and API key from your Omniweb dashboard.
-  {% endcomment %}
-  {% if settings.enable_ai_widget and settings.widget_api_url != blank and settings.widget_api_key != blank %}
-    <script
-      src="{{ settings.widget_api_url }}/widget.js"
-      data-api-url="{{ settings.widget_api_url }}"
-      data-api-key="{{ settings.widget_api_key }}"
-      data-shop-id="{{ shop.permanent_domain }}"
-      defer
-    ></script>
-    <script>
-      window.__owContext = {
-        pageType: {{ template.name | json }},
-        shopName: {{ shop.name | json }}
-      };
-    </script>
-  {% endif %}
+  {% render 'ai-widget' %}
 
   <script>
     window.shopUrl = '{{ shop.url }}';
