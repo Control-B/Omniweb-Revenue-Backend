@@ -81,7 +81,7 @@ The API server (`artifacts/api-server/`) is extended with these endpoints:
 - No Admin API needed — all data comes from Shopify storefront Liquid globals
 
 **Env vars needed:**
-- `AI_INTEGRATIONS_OPENAI_BASE_URL` + `AI_INTEGRATIONS_OPENAI_API_KEY` — set automatically via Replit AI integrations
+- `AI_INTEGRATIONS_OPENAI_BASE_URL` + `AI_INTEGRATIONS_OPENAI_API_KEY` — set automatically via Omniweb AI integrations
 - `ELEVENLABS_API_KEY` — add when ready to enable voice (user to provide)
 - `WIDGET_API_KEY` — optional; defaults to `dev-widget-key` in dev
 
