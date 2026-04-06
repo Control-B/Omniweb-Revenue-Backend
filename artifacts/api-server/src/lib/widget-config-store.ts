@@ -1,6 +1,6 @@
 import { db, widgetConfigsTable, merchantsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { randomUUID } from "crypto";
+import { randomUUID, createHash } from "crypto";
 
 export interface WidgetConfig {
   shopId: string;
@@ -50,11 +50,12 @@ function rowToConfig(row: typeof widgetConfigsTable.$inferSelect): WidgetConfig 
 }
 
 async function ensureMerchantExists(shopId: string): Promise<void> {
+  const shopHash = createHash("sha256").update(shopId).digest("hex").slice(0, 12);
   await db
     .insert(merchantsTable)
     .values({
       id: randomUUID(),
-      email: `${shopId.replace(/[^a-z0-9]/gi, "-")}@placeholder.omniweb.dev`,
+      email: `shop-${shopHash}@placeholder.omniweb.dev`,
       shopId,
       plan: shopId === DEMO_SHOP_ID ? "pro" : "free",
       createdAt: new Date(),
