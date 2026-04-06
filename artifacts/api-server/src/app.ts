@@ -67,9 +67,10 @@ const chatLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req: Request) => {
-    const body = req.body as { shopId?: string };
-    if (body?.shopId) return body.shopId;
-    return "unknown";
+    const body = req.body as { shopId?: string; sessionId?: string };
+    const shopId = body?.shopId ?? "unknown";
+    const sessionId = body?.sessionId ?? "anon";
+    return `${shopId}::${sessionId}`;
   },
   validate: { keyGeneratorIpFallback: false },
   message: { error: "Chat rate limit exceeded", message: "Too many messages. Please wait a moment." },
@@ -83,10 +84,11 @@ const voiceLimiter = rateLimit({
   message: { error: "Voice rate limit exceeded", message: "Too many voice requests. Please wait a moment." },
 });
 
-app.use(globalLimiter);
-
-/* Widget static file — public, no API key required, CORS set in route handler */
+/* Widget static file served BEFORE global rate limiter — it's a public CDN-like
+   asset and should not consume the per-IP API request budget */
 app.use(widgetFileRouter);
+
+app.use(globalLimiter);
 
 /* Widget API surface — API key auth + per-endpoint rate limiting */
 app.use("/api/chat", chatLimiter, requireApiKey);
