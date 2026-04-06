@@ -125,12 +125,26 @@ function formatPageContext(ctx: Record<string, unknown>): string {
     if (ctx.searchResultCount) lines.push(`Results Found: ${ctx.searchResultCount}`);
   }
 
-  return lines.join("\n");
+  /* Prompt budget guard — cap the context block so large product catalogues or long
+     descriptions don't inflate token costs / latency. ~3 000 chars ≈ ~750 tokens,
+     well within context limits but safely bounded. */
+  const MAX_CONTEXT_CHARS = 3_000;
+  const raw = lines.join("\n");
+  return raw.length > MAX_CONTEXT_CHARS
+    ? raw.slice(0, MAX_CONTEXT_CHARS) + "\n…(context truncated)"
+    : raw;
 }
 
 /**
  * Build the full system prompt: persona + formatted page context.
- * This is rebuilt on every request so the AI always sees the current page.
+ *
+ * Implementation note: we extract data from Shopify Liquid globals rendered
+ * server-side into window.__owContext, rather than client-side ShopifyAnalytics
+ * or JSON-LD. Liquid gives richer, more reliable data (all variants, stock status,
+ * collection products) without any extra client-side parsing overhead.
+ *
+ * This is rebuilt on every request so the AI always sees the current page,
+ * even if the shopper navigated within the same chat session.
  */
 function buildSystemPrompt(persona: string, pageContext?: Record<string, unknown>): string {
   if (!pageContext) return persona;
