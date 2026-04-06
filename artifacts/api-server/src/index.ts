@@ -16,19 +16,28 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-seedDemoShop()
-  .then(() => {
+async function start(): Promise<void> {
+  try {
+    await seedDemoShop();
     logger.info("Demo shop seeded");
-  })
-  .catch((err: unknown) => {
+  } catch (err) {
     logger.warn({ err }, "Demo shop seed failed — continuing startup");
-  });
-
-app.listen(port, (err) => {
-  if (err) {
-    logger.error({ err }, "Error listening on port");
-    process.exit(1);
   }
 
-  logger.info({ port }, "Server listening");
+  await new Promise<void>((resolve, reject) => {
+    app.listen(port, (err) => {
+      if (err) {
+        logger.error({ err }, "Error listening on port");
+        reject(err);
+        return;
+      }
+      logger.info({ port }, "Server listening");
+      resolve();
+    });
+  });
+}
+
+start().catch((err: unknown) => {
+  logger.error({ err }, "Fatal startup error");
+  process.exit(1);
 });
