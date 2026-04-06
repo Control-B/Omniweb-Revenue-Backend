@@ -3,9 +3,40 @@ import cors from "cors";
 import pinoHttp from "pino-http";
 import rateLimit from "express-rate-limit";
 import router from "./routes/index.js";
+import { requireApiKey } from "./middleware/api-key.js";
 import { logger } from "./lib/logger.js";
 
 const app: Express = express();
+
+const ALLOWED_ORIGINS = [
+  /\.myshopify\.com$/,
+  /\.shopify\.com$/,
+  /localhost/,
+  /127\.0\.0\.1/,
+  /\.replit\.dev$/,
+  /\.replit\.app$/,
+  /\.spock\.replit\.dev$/,
+];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+      const allowed = ALLOWED_ORIGINS.some((pattern) => pattern.test(origin));
+      if (allowed) {
+        callback(null, true);
+      } else {
+        callback(new Error(`Origin ${origin} not allowed by CORS policy`));
+      }
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-widget-api-key"],
+    credentials: true,
+  }),
+);
 
 app.use(
   pinoHttp({
@@ -27,28 +58,6 @@ app.use(
   }),
 );
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (
-        !origin ||
-        origin.endsWith(".myshopify.com") ||
-        origin.endsWith(".shopify.com") ||
-        origin.includes("localhost") ||
-        origin.includes("replit.dev") ||
-        origin.includes("replit.app")
-      ) {
-        callback(null, true);
-      } else {
-        callback(null, true);
-      }
-    },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "x-widget-api-key"],
-    credentials: true,
-  }),
-);
-
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 
@@ -66,8 +75,8 @@ const chatLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req: Request) => {
-    const shopId = (req.body as { shopId?: string })?.shopId ?? req.ip ?? "unknown";
-    return shopId;
+    const body = req.body as { shopId?: string };
+    return body?.shopId ?? req.ip ?? "unknown";
   },
   message: { error: "Chat rate limit exceeded", message: "Too many messages. Please wait a moment." },
 });
@@ -81,8 +90,12 @@ const voiceLimiter = rateLimit({
 });
 
 app.use(globalLimiter);
-app.use("/api/chat", chatLimiter);
-app.use("/api/voice", voiceLimiter);
+
+app.use("/api/chat", chatLimiter, requireApiKey);
+app.use("/api/voice", voiceLimiter, requireApiKey);
+app.use("/api/voices-status", requireApiKey);
+app.use("/api/widget-config", requireApiKey);
+app.use("/api/conversations", requireApiKey);
 
 app.use("/api", router);
 
