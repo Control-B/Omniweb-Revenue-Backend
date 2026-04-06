@@ -4,14 +4,13 @@
 
 pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
 
-## Shopify Theme
+## Shopify Storefront Integration
 
-A complete Shopify Online Store 2.0 theme (`omniweb-revenue-theme/`) is included:
-- 40 files, ~206 KB total
-- Layout, templates (JSON), sections, snippets, assets, config, locales
-- Full product page, collection page, cart drawer, FAQ, testimonials, trust badges, upsell
-- Vanilla JS (no dependencies), fully mobile responsive
-- Shopify CLI compatible — see `omniweb-revenue-theme/README.md`
+This repo ships the standalone Omniweb app backend, merchant dashboard, and embeddable widget.
+
+- Merchants integrate the widget into their existing Shopify theme
+- Installation instructions live in `artifacts/dashboard/src/pages/install.tsx`
+- The storefront snippet/theme code can live in a separate theme repository
 
 ## Merchant Auth System
 
@@ -73,13 +72,13 @@ The API server (`artifacts/api-server/`) is extended with these endpoints:
 
 ## Shopify Product Context Integration
 
-- `omniweb-revenue-theme/snippets/ai-widget.liquid` — drop-in snippet that:
-  1. Writes `window.__owContext` with full product/collection/cart data from Liquid globals
-  2. Loads the widget `<script>` (conditional on theme settings)
-- Theme.liquid calls `{% render 'ai-widget' %}` to include it
-- Chat backend (`/api/chat`) formats pageContext into a structured system-prompt block
+- Merchants can add a Liquid snippet to their existing theme that:
+  1. Writes `window.__owContext` with product/collection/cart data from Liquid globals
+  2. Loads the Omniweb widget `<script>`
+- The dashboard install page provides the copy-paste snippet merchants need
+- Chat backend (`/api/chat`) formats `pageContext` into a structured system-prompt block
 - Context is updated on every message, so AI stays current when the shopper navigates
-- No Admin API needed — all data from Shopify storefront Liquid globals
+- No Admin API needed — all data comes from Shopify storefront Liquid globals
 
 **Env vars needed:**
 - `AI_INTEGRATIONS_OPENAI_BASE_URL` + `AI_INTEGRATIONS_OPENAI_API_KEY` — set automatically via Replit AI integrations
