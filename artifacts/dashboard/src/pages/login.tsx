@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -12,8 +12,8 @@ import { LayoutDashboard, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 const loginSchema = z.object({
-  shopId: z.string().min(1, "Shop ID is required"),
-  apiKey: z.string().min(1, "API Key is required"),
+  email: z.string().email("Please enter a valid email"),
+  password: z.string().min(1, "Password is required"),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -32,29 +32,31 @@ export default function Login() {
   const form = useForm<LoginFormValues>({
     resolver: makeZodResolver(loginSchema),
     defaultValues: {
-      shopId: "",
-      apiKey: "",
+      email: "",
+      password: "",
     },
   });
 
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/widget-config/${data.shopId}`, {
-        headers: {
-          "x-widget-api-key": data.apiKey,
-        },
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: data.email, password: data.password }),
       });
 
-      if (res.ok) {
-        login(data);
+      const body = await res.json() as { token?: string; shopId?: string; email?: string; plan?: string; error?: string };
+
+      if (res.ok && body.token) {
+        login({ token: body.token, shopId: body.shopId!, email: body.email!, plan: body.plan });
         setLocation("/settings");
       } else {
         toast.error("Authentication Failed", {
-          description: "Invalid Shop ID or API Key. Please check your credentials and try again.",
+          description: body.error ?? "Invalid email or password. Please try again.",
         });
       }
-    } catch (error) {
+    } catch {
       toast.error("Connection Error", {
         description: "Failed to connect to the server. Please try again.",
       });
@@ -77,41 +79,24 @@ export default function Login() {
         <Card className="border-border shadow-lg">
           <CardHeader>
             <CardTitle>Sign In</CardTitle>
-            <CardDescription>Enter your store credentials to access the dashboard</CardDescription>
+            <CardDescription>Enter your email and password to access the dashboard</CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
                 <FormField
                   control={form.control}
-                  name="shopId"
+                  name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Shop ID</FormLabel>
+                      <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input 
-                          placeholder="mystore.myshopify.com" 
-                          {...field} 
-                          data-testid="input-shop-id"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="apiKey"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>API Key</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="password" 
-                          placeholder="ow_live_xxxxxxxxxxxxxxxx" 
-                          {...field} 
-                          data-testid="input-api-key"
+                        <Input
+                          type="email"
+                          placeholder="you@yourstore.com"
+                          autoComplete="email"
+                          data-testid="input-email"
+                          {...field}
                         />
                       </FormControl>
                       <FormMessage />
@@ -119,16 +104,36 @@ export default function Login() {
                   )}
                 />
 
-                <Button 
-                  type="submit" 
-                  className="w-full" 
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="password"
+                          placeholder="••••••••"
+                          autoComplete="current-password"
+                          data-testid="input-password"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <Button
+                  type="submit"
+                  className="w-full"
                   disabled={isLoading}
                   data-testid="button-submit-login"
                 >
                   {isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Authenticating...
+                      Signing in...
                     </>
                   ) : (
                     "Sign In"
@@ -136,6 +141,13 @@ export default function Login() {
                 </Button>
               </form>
             </Form>
+
+            <div className="mt-5 text-center text-sm text-muted-foreground">
+              Don't have an account?{" "}
+              <Link href="/signup" className="text-primary underline underline-offset-4 hover:opacity-80">
+                Sign up
+              </Link>
+            </div>
           </CardContent>
         </Card>
       </div>

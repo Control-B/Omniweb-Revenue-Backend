@@ -26,33 +26,43 @@ export interface Session {
   createdAt: string;
 }
 
-const fetchWithAuth = async (url: string, credentials: { shopId: string; apiKey: string } | null, options: RequestInit = {}) => {
-  if (!credentials) throw new Error("Unauthorized");
+export interface MerchantInfo {
+  merchantId: string;
+  shopId: string;
+  email: string;
+  plan: string;
+  apiKeyPrefix: string | null;
+  apiKeyCreatedAt: string | null;
+  createdAt: string;
+}
+
+const fetchWithAuth = async (url: string, token: string | null, options: RequestInit = {}) => {
+  if (!token) throw new Error("Unauthorized");
 
   const response = await fetch(url, {
     ...options,
     headers: {
       "Content-Type": "application/json",
-      "x-widget-api-key": credentials.apiKey,
+      "Authorization": `Bearer ${token}`,
       ...options.headers,
     },
   });
 
   if (!response.ok) {
-    throw new Error(response.statusText || "Request failed");
+    const body = await response.json().catch(() => ({})) as { error?: string };
+    throw new Error(body.error ?? response.statusText ?? "Request failed");
   }
 
   return response.json();
 };
 
-export function useWidgetConfig(shopId?: string) {
+export function useWidgetConfig() {
   const { credentials } = useAuth();
-  const targetShopId = shopId || credentials?.shopId;
 
   return useQuery<WidgetConfig>({
-    queryKey: ["widgetConfig", targetShopId],
-    queryFn: () => fetchWithAuth(`/api/widget-config/${targetShopId}`, credentials),
-    enabled: !!targetShopId && !!credentials,
+    queryKey: ["widgetConfig", credentials?.shopId],
+    queryFn: () => fetchWithAuth("/api/widget-config", credentials?.token ?? null),
+    enabled: !!credentials,
   });
 }
 
@@ -61,8 +71,8 @@ export function useUpdateWidgetConfig() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: Partial<WidgetConfig>) => 
-      fetchWithAuth(`/api/widget-config/${credentials?.shopId}`, credentials, {
+    mutationFn: (data: Partial<WidgetConfig>) =>
+      fetchWithAuth("/api/widget-config", credentials?.token ?? null, {
         method: "PUT",
         body: JSON.stringify(data),
       }),
@@ -77,7 +87,7 @@ export function useVoices() {
 
   return useQuery<{ voices: Voice[] }>({
     queryKey: ["voices"],
-    queryFn: () => fetchWithAuth("/api/voices", credentials),
+    queryFn: () => fetchWithAuth("/api/voices", credentials?.token ?? null),
     enabled: !!credentials,
   });
 }
@@ -87,8 +97,33 @@ export function useConversations() {
 
   return useQuery<{ sessions: Session[]; total: number }>({
     queryKey: ["conversations", credentials?.shopId],
-    queryFn: () => fetchWithAuth(`/api/conversations/${credentials?.shopId}`, credentials),
+    queryFn: () => fetchWithAuth("/api/conversations", credentials?.token ?? null),
     enabled: !!credentials?.shopId,
-    refetchInterval: 30000, // auto-refresh every 30s
+    refetchInterval: 30000,
+  });
+}
+
+export function useMerchantInfo() {
+  const { credentials } = useAuth();
+
+  return useQuery<MerchantInfo>({
+    queryKey: ["merchantInfo", credentials?.shopId],
+    queryFn: () => fetchWithAuth("/api/auth/me", credentials?.token ?? null),
+    enabled: !!credentials,
+  });
+}
+
+export function useRotateApiKey() {
+  const { credentials } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () =>
+      fetchWithAuth("/api/auth/rotate-key", credentials?.token ?? null, {
+        method: "POST",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["merchantInfo", credentials?.shopId] });
+    },
   });
 }

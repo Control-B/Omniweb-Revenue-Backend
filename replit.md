@@ -13,6 +13,32 @@ A complete Shopify Online Store 2.0 theme (`omniweb-revenue-theme/`) is included
 - Vanilla JS (no dependencies), fully mobile responsive
 - Shopify CLI compatible — see `omniweb-revenue-theme/README.md`
 
+## Merchant Auth System
+
+Merchants sign up with email + shopId + password. Passwords hashed with bcryptjs (12 rounds). API keys use format `ow_live_<48 hex chars>`, stored as SHA-256 hash.
+
+**Auth endpoints (rate-limited to 10 req/min):**
+| Endpoint | Auth | Description |
+|----------|------|-------------|
+| `POST /api/auth/signup` | None | Create account → returns JWT + API key (shown once) |
+| `POST /api/auth/login` | None | Email + password → returns 7-day JWT |
+| `GET /api/auth/me` | Bearer JWT | Returns merchant profile + apiKeyPrefix |
+| `POST /api/auth/rotate-key` | Bearer JWT | Generate new API key, old key invalidated immediately |
+
+**Admin endpoints** (`/api/widget-config`, `/api/conversations`, `/api/voices`) require either:
+- `Authorization: Bearer <jwt>` (dashboard sessions)
+- `x-widget-api-key: <key>` (widget-to-backend calls)
+
+**Key files:**
+- `artifacts/api-server/src/middleware/api-key.ts` — `requireAuth` middleware (JWT or API key)
+- `artifacts/api-server/src/lib/jwt.ts` — 7-day JWT sign/verify (uses SESSION_SECRET env var)
+- `artifacts/api-server/src/routes/auth.ts` — signup/login/me/rotate-key endpoints
+
+**Dashboard auth flow:**
+- `sessionStorage["ow_merchant_session"]` = `{token, shopId, email}`
+- Signup → shows API key once → "Continue to Dashboard" → `/settings`
+- Pages: Login (`/`), Signup (`/signup`), API Keys (`/api-keys`)
+
 ## AI Sales Widget Backend
 
 The API server (`artifacts/api-server/`) is extended with these endpoints:
@@ -21,16 +47,14 @@ The API server (`artifacts/api-server/`) is extended with these endpoints:
 |----------|-------------|
 | `POST /api/chat` | AI chat — accepts `{ sessionId, message, shopId, pageContext }`, returns AI reply |
 | `POST /api/voice` | ElevenLabs TTS — accepts `{ text, voiceId }`, streams audio (requires `ELEVENLABS_API_KEY`) |
-| `GET /api/widget-config/:shopId` | Widget settings (greeting, color, voice, persona) |
-| `PUT /api/widget-config/:shopId` | Update widget settings |
-| `GET /api/voices` | Available ElevenLabs voice list |
-| `GET /api/voices-status` | ElevenLabs connection status + live voices if connected |
-| `GET /api/conversations/:shopId` | Recent chat sessions |
+| `GET /api/widget/:shopId/config` | Public widget settings (no auth, for the embeddable widget) |
+| `GET/PUT /api/widget-config` | Admin widget settings (requires auth, uses req.merchant.shopId) |
+| `GET /api/voices` | Available ElevenLabs voice list (requires auth) |
+| `GET /api/conversations` | Recent chat sessions (requires auth, uses req.merchant.shopId) |
 
 **Key files:**
 - `artifacts/api-server/src/lib/session-store.ts` — DB-backed conversation history (async, PostgreSQL via Drizzle)
 - `artifacts/api-server/src/lib/widget-config-store.ts` — DB-backed per-shop widget config (async upsert, auto-seeds demo shop)
-- `artifacts/api-server/src/middleware/api-key.ts` — API key validation middleware
 - `artifacts/api-server/src/routes/chat.ts` — OpenAI chat endpoint with `buildSystemPrompt` + `formatPageContext`
 - `artifacts/api-server/src/routes/voice.ts` — ElevenLabs voice endpoint (stub if no key)
 - `artifacts/api-server/src/routes/widget-config.ts` — config + conversations endpoints

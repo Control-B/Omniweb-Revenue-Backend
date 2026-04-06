@@ -4,7 +4,7 @@ import pinoHttp from "pino-http";
 import rateLimit from "express-rate-limit";
 import router from "./routes/index.js";
 import widgetFileRouter from "./routes/widget.js";
-import { requireApiKey } from "./middleware/api-key.js";
+import { requireAuth } from "./middleware/api-key.js";
 import { logger } from "./lib/logger.js";
 
 const app: Express = express();
@@ -13,20 +13,16 @@ app.set("trust proxy", 1);
 /**
  * CORS strategy
  * ─────────────
- * All API endpoints are secured by the x-widget-api-key header + rate limiting.
- * The widget is embedded on arbitrary merchant storefront domains (custom domains,
- * myshopify.com subdomains, etc.), so we cannot allowlist by origin.
- *
- * Access-Control-Allow-Origin: * is safe here because:
- *  • Every sensitive endpoint requires x-widget-api-key (not a cookie/session)
- *  • credentials: false means cookies are not sent cross-origin
- *  • Rate limiting provides an additional abuse-prevention layer
+ * Public widget endpoints (chat, voice, widget config) are accessed from any
+ * storefront domain, so we use Access-Control-Allow-Origin: *.
+ * Admin endpoints require Authorization: Bearer or x-widget-api-key.
+ * credentials: false means cookies are never sent cross-origin.
  */
 app.use(
   cors({
     origin: "*",
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "x-widget-api-key"],
+    allowedHeaders: ["Content-Type", "x-widget-api-key", "Authorization"],
     credentials: false,
   }),
 );
@@ -85,21 +81,31 @@ const voiceLimiter = rateLimit({
   message: { error: "Voice rate limit exceeded", message: "Too many voice requests. Please wait a moment." },
 });
 
-/* Widget static file served BEFORE global rate limiter — it's a public CDN-like
-   asset and should not consume the per-IP API request budget */
+const authLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many auth attempts", message: "Please wait a minute before trying again." },
+});
+
+/* Widget static file served BEFORE global rate limiter — public CDN-like asset */
 app.use(widgetFileRouter);
 
 app.use(globalLimiter);
 
-/* Public widget endpoints — rate limited, no API key required */
+/* Public widget endpoints — rate limited, no auth required */
 app.use("/api/chat", chatLimiter);
 app.use("/api/voice", voiceLimiter);
 
-/* Admin-only endpoints — require API key */
-app.use("/api/voices", requireApiKey);
-app.use("/api/voices-status", requireApiKey);
-app.use("/api/widget-config", requireApiKey);
-app.use("/api/conversations", requireApiKey);
+/* Auth endpoints — rate limited, no auth required */
+app.use("/api/auth", authLimiter);
+
+/* Admin-only endpoints — require JWT or API key (sets req.merchant) */
+app.use("/api/voices", requireAuth);
+app.use("/api/voices-status", requireAuth);
+app.use("/api/widget-config", requireAuth);
+app.use("/api/conversations", requireAuth);
 
 app.use("/api", router);
 

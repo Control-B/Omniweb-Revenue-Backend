@@ -8,19 +8,21 @@ import NotFound from "@/pages/not-found";
 
 // Pages
 import Login from "@/pages/login";
+import Signup from "@/pages/signup";
 import Settings from "@/pages/settings";
 import Conversations from "@/pages/conversations";
 import Install from "@/pages/install";
+import ApiKeys from "@/pages/api-keys";
 
 const queryClient = new QueryClient();
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated } = useAuth();
-  
+
   if (!isAuthenticated) {
     return <Login />;
   }
-  
+
   return (
     <Layout>
       <Component />
@@ -32,6 +34,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Login} />
+      <Route path="/signup" component={Signup} />
       <Route path="/settings">
         <ProtectedRoute component={Settings} />
       </Route>
@@ -40,6 +43,9 @@ function Router() {
       </Route>
       <Route path="/install">
         <ProtectedRoute component={Install} />
+      </Route>
+      <Route path="/api-keys">
+        <ProtectedRoute component={ApiKeys} />
       </Route>
       <Route component={NotFound} />
     </Switch>

@@ -20,37 +20,29 @@ router.get(
     try {
       const config = await getPublicWidgetConfig(shopId);
       res.json(config);
-    } catch (err) {
+    } catch {
       res.status(500).json({ error: "Failed to fetch widget config" });
     }
   }
 );
 
 router.get(
-  "/widget-config/:shopId",
-  async (req: Request<{ shopId: string }>, res: Response): Promise<void> => {
-    const shopId = req.params.shopId;
-    if (!shopId || typeof shopId !== "string") {
-      res.status(400).json({ error: "shopId is required" });
-      return;
-    }
+  "/widget-config",
+  async (req: Request, res: Response): Promise<void> => {
+    const shopId = req.merchant!.shopId;
     try {
       const config = await getWidgetConfig(shopId);
       res.json(config);
-    } catch (err) {
+    } catch {
       res.status(500).json({ error: "Failed to fetch widget config" });
     }
   }
 );
 
 router.put(
-  "/widget-config/:shopId",
-  async (req: Request<{ shopId: string }>, res: Response): Promise<void> => {
-    const shopId = req.params.shopId;
-    if (!shopId || typeof shopId !== "string") {
-      res.status(400).json({ error: "shopId is required" });
-      return;
-    }
+  "/widget-config",
+  async (req: Request, res: Response): Promise<void> => {
+    const shopId = req.merchant!.shopId;
 
     const allowed = [
       "greeting",
@@ -75,7 +67,7 @@ router.put(
         updates as Parameters<typeof updateWidgetConfig>[1]
       );
       res.json(updated);
-    } catch (err) {
+    } catch {
       res.status(500).json({ error: "Failed to update widget config" });
     }
   }
@@ -86,18 +78,14 @@ router.get("/voices", (_req: Request, res: Response): void => {
 });
 
 router.get(
-  "/conversations/:shopId",
-  async (req: Request<{ shopId: string }>, res: Response): Promise<void> => {
-    const shopId = req.params.shopId;
-    if (!shopId || typeof shopId !== "string") {
-      res.status(400).json({ error: "shopId is required" });
-      return;
-    }
+  "/conversations",
+  async (req: Request, res: Response): Promise<void> => {
+    const shopId = req.merchant!.shopId;
     try {
       const limit = Math.min(Number(req.query["limit"] ?? 50), 100);
       const sessions = await getRecentSessions(shopId, limit);
       res.json({ sessions, total: sessions.length });
-    } catch (err) {
+    } catch {
       res.status(500).json({ error: "Failed to fetch conversations" });
     }
   }

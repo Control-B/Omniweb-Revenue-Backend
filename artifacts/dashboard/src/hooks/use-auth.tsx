@@ -1,45 +1,59 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, ReactNode } from "react";
 import { useLocation } from "wouter";
 
-interface AuthCredentials {
+interface AuthState {
+  token: string;
   shopId: string;
-  apiKey: string;
+  email: string;
+  plan?: string;
 }
 
 interface AuthContextType {
-  credentials: AuthCredentials | null;
-  login: (creds: AuthCredentials) => void;
+  auth: AuthState | null;
+  login: (state: AuthState) => void;
   logout: () => void;
   isAuthenticated: boolean;
+  credentials: { shopId: string; token: string } | null;
+}
+
+const STORAGE_KEY = "ow_merchant_session";
+
+function readFromStorage(): AuthState | null {
+  try {
+    const stored = sessionStorage.getItem(STORAGE_KEY);
+    return stored ? (JSON.parse(stored) as AuthState) : null;
+  } catch {
+    return null;
+  }
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [credentials, setCredentials] = useState<AuthCredentials | null>(() => {
-    try {
-      const stored = localStorage.getItem("ow_merchant_auth");
-      return stored ? JSON.parse(stored) : null;
-    } catch {
-      return null;
-    }
-  });
-
+  const [auth, setAuth] = useState<AuthState | null>(() => readFromStorage());
   const [, setLocation] = useLocation();
 
-  const login = (creds: AuthCredentials) => {
-    setCredentials(creds);
-    localStorage.setItem("ow_merchant_auth", JSON.stringify(creds));
+  const login = (state: AuthState) => {
+    setAuth(state);
+    try {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch {
+    }
   };
 
   const logout = () => {
-    setCredentials(null);
-    localStorage.removeItem("ow_merchant_auth");
+    setAuth(null);
+    try {
+      sessionStorage.removeItem(STORAGE_KEY);
+    } catch {
+    }
     setLocation("/");
   };
 
+  const credentials = auth ? { shopId: auth.shopId, token: auth.token } : null;
+
   return (
-    <AuthContext.Provider value={{ credentials, login, logout, isAuthenticated: !!credentials }}>
+    <AuthContext.Provider value={{ auth, login, logout, isAuthenticated: !!auth, credentials }}>
       {children}
     </AuthContext.Provider>
   );

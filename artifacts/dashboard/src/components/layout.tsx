@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { LogOut, Settings, MessageSquare, Code, LayoutDashboard } from "lucide-react";
+import { LogOut, Settings, MessageSquare, Code, LayoutDashboard, Key } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -14,11 +14,11 @@ export function Layout({ children }: { children: ReactNode }) {
     { href: "/settings", label: "Settings", icon: Settings },
     { href: "/conversations", label: "Conversations", icon: MessageSquare },
     { href: "/install", label: "Install", icon: Code },
+    { href: "/api-keys", label: "API Keys", icon: Key },
   ];
 
   return (
     <div className="flex min-h-screen w-full bg-slate-50 dark:bg-slate-950">
-      {/* Sidebar */}
       <aside className="w-64 border-r border-border bg-card flex flex-col hidden md:flex">
         <div className="p-6 border-b border-border flex items-center gap-3">
           <div className="bg-primary/10 p-2 rounded-lg text-primary">
@@ -26,7 +26,7 @@ export function Layout({ children }: { children: ReactNode }) {
           </div>
           <span className="font-semibold text-lg tracking-tight">Omniweb</span>
         </div>
-        
+
         <div className="px-4 py-4 mb-2">
           <div className="text-xs uppercase font-medium text-muted-foreground tracking-wider mb-1 px-2">
             Store
@@ -45,7 +45,7 @@ export function Layout({ children }: { children: ReactNode }) {
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:text-foreground hover:bg-accent"
                 }`}
-                data-testid={`nav-${item.label.toLowerCase()}`}
+                data-testid={`nav-${item.label.toLowerCase().replace(" ", "-")}`}
               >
                 <item.icon size={18} />
                 {item.label}
@@ -55,9 +55,9 @@ export function Layout({ children }: { children: ReactNode }) {
         </nav>
 
         <div className="p-4 border-t border-border">
-          <Button 
-            variant="ghost" 
-            className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10" 
+          <Button
+            variant="ghost"
+            className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10"
             onClick={logout}
             data-testid="button-logout"
           >
@@ -67,9 +67,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      {/* Main content */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Mobile header */}
         <header className="md:hidden h-16 border-b border-border bg-card flex items-center justify-between px-4">
           <div className="flex items-center gap-2">
             <LayoutDashboard size={20} className="text-primary" />
@@ -80,7 +78,6 @@ export function Layout({ children }: { children: ReactNode }) {
           </Button>
         </header>
 
-        {/* Mobile Nav */}
         <nav className="md:hidden border-b border-border bg-card px-2 flex overflow-x-auto">
           {navItems.map((item) => (
             <Link key={item.href} href={item.href}>
