@@ -3,13 +3,17 @@ import { logger } from "./lib/logger";
 import { checkDatabaseHealth } from "./lib/db-health";
 import { seedDemoShop } from "./lib/widget-config-store";
 
+function readSessionSecret(): string | undefined {
+  return process.env["SESSION_SECRET"] ?? process.env["session_secret"];
+}
+
 /* In production, SESSION_SECRET must be set to a strong random value.
  * A missing or default secret would allow JWT forgery. */
-const sessionSecret = process.env["SESSION_SECRET"];
+const sessionSecret = readSessionSecret();
 const isProduction = process.env["NODE_ENV"] === "production";
 
 if (isProduction && (!sessionSecret || sessionSecret === "dev-jwt-secret-not-for-production")) {
-  logger.warn("SESSION_SECRET not set — legacy password sessions will be unavailable until it is configured.");
+  logger.warn("SESSION_SECRET not set — configure SESSION_SECRET (or session_secret) to enable secure legacy password sessions.");
 } else if (!sessionSecret) {
   logger.warn("SESSION_SECRET not set — using insecure dev fallback. Set SESSION_SECRET before deploying.");
 }

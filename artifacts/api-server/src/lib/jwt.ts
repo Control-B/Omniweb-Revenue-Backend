@@ -6,8 +6,12 @@ export interface JwtPayload {
   email: string;
 }
 
+function readSessionSecret(): string | undefined {
+  return process.env.SESSION_SECRET ?? process.env.session_secret;
+}
+
 function getSecret(): string {
-  const secret = process.env.SESSION_SECRET;
+  const secret = readSessionSecret();
   if (!secret) {
     return "dev-jwt-secret-not-for-production";
   }
