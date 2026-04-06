@@ -3,6 +3,21 @@ import { logger } from "./lib/logger";
 import { checkDatabaseHealth } from "./lib/db-health";
 import { seedDemoShop } from "./lib/widget-config-store";
 
+/* In production, SESSION_SECRET must be set to a strong random value.
+ * A missing or default secret would allow JWT forgery. */
+const sessionSecret = process.env["SESSION_SECRET"];
+const isProduction = process.env["NODE_ENV"] === "production";
+
+if (isProduction && (!sessionSecret || sessionSecret === "dev-jwt-secret-not-for-production")) {
+  throw new Error(
+    "SESSION_SECRET environment variable must be set to a strong, unique value in production.",
+  );
+}
+
+if (!sessionSecret) {
+  logger.warn("SESSION_SECRET not set — using insecure dev fallback. Set SESSION_SECRET before deploying.");
+}
+
 const rawPort = process.env["PORT"];
 
 if (!rawPort) {
