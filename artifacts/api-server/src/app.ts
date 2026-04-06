@@ -93,6 +93,7 @@ app.use(globalLimiter);
 
 app.use("/api/chat", chatLimiter, requireApiKey);
 app.use("/api/voice", voiceLimiter, requireApiKey);
+app.use("/api/voices", requireApiKey);
 app.use("/api/voices-status", requireApiKey);
 app.use("/api/widget-config", requireApiKey);
 app.use("/api/conversations", requireApiKey);

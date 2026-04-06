@@ -37,17 +37,17 @@ router.post("/chat", async (req: Request, res: Response): Promise<void> => {
   const config = getWidgetConfig(shop);
   const session = getOrCreateSession(sessionId, shop);
 
-  if (session.messages.length === 0 || !session.messages.find((m) => m.role === "system")) {
+  if (session.messages.length === 0) {
     let systemPrompt = config.persona;
     if (pageContext) {
       systemPrompt += `\n\nCurrent page context:\n${JSON.stringify(pageContext, null, 2)}`;
     }
     const systemMsg: Message = { role: "system", content: systemPrompt };
-    addMessageToSession(sessionId, systemMsg);
+    addMessageToSession(sessionId, shop, systemMsg);
   }
 
   const userMsg: Message = { role: "user", content: message.trim() };
-  addMessageToSession(sessionId, userMsg);
+  addMessageToSession(sessionId, shop, userMsg);
 
   const openai = getOpenAIClient();
 
@@ -55,12 +55,13 @@ router.post("/chat", async (req: Request, res: Response): Promise<void> => {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: session.messages.map((m) => ({ role: m.role, content: m.content })),
-      max_completion_tokens: 512,
+      max_tokens: 512,
     });
 
-    const reply = completion.choices[0]?.message?.content ?? "Sorry, I couldn't generate a reply.";
+    const reply =
+      completion.choices[0]?.message?.content ?? "Sorry, I couldn't generate a reply.";
     const assistantMsg: Message = { role: "assistant", content: reply };
-    addMessageToSession(sessionId, assistantMsg);
+    addMessageToSession(sessionId, shop, assistantMsg);
 
     res.json({
       reply,
