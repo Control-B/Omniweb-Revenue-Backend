@@ -3,14 +3,23 @@ import { checkUsage } from "../lib/plan-limits.js";
 import { PLAN_NAMES } from "../lib/stripe.js";
 
 /**
- * Middleware enforcing monthly message limits on widget endpoints (/api/chat, /api/voice).
+ * Middleware enforcing active subscriptions and monthly message limits on
+ * widget endpoints (/api/chat, /api/voice).
  *
- * Checks both:
- *   1. Subscription status — inactive/past_due/canceled subscriptions are downgraded to
- *      free-tier limits (50 messages/month) regardless of the nominal plan.
- *   2. Usage count — returns 402 when the effective limit is reached.
+ * Two independent gates — either can trigger a 402:
  *
- * The shopId is read from req.body (both endpoints accept it in the POST body).
+ * 1. **Subscription gate** (paid plans only):
+ *    If the merchant is on a paid plan (starter / pro) but their subscription
+ *    status is NOT "active" or "trialing", return 402 immediately — even if
+ *    they have 0 messages used this month.
+ *
+ * 2. **Usage gate** (all plans):
+ *    If the merchant has consumed all messages in their effective monthly
+ *    allowance (free plan = 50, starter = 500, pro = 5 000), return 402.
+ *    The effective allowance is always the *free* tier when the subscription
+ *    is inactive, so an inactive paid merchant gets both gates applied.
+ *
+ * The shopId is read from req.body.
  * If shopId is absent the request passes through (other middleware validates it).
  */
 export async function requirePlanLimits(
@@ -26,29 +35,31 @@ export async function requirePlanLimits(
 
   try {
     const status = await checkUsage(shopId.slice(0, 200));
+    const isPaidPlan = ["starter", "pro"].includes(status.plan);
+    const isActiveSubscription = ["active", "trialing"].includes(status.subscriptionStatus);
 
+    // Gate 1: paid plan with inactive subscription → block immediately
+    if (isPaidPlan && !isActiveSubscription) {
+      const planName = PLAN_NAMES[status.plan] ?? status.plan;
+      res.status(402).json({
+        error: "Subscription inactive",
+        message:
+          `Your ${planName} subscription is ${status.subscriptionStatus}. ` +
+          `Please renew or upgrade your subscription to continue using the AI widget.`,
+        plan: status.plan,
+        effectivePlan: status.effectivePlan,
+        subscriptionStatus: status.subscriptionStatus,
+        upgradeUrl: "/dashboard/billing",
+      });
+      return;
+    }
+
+    // Gate 2: usage limit exhausted
     if (!status.allowed) {
       const effectivePlanName = PLAN_NAMES[status.effectivePlan] ?? status.effectivePlan;
-      const nominalPlanName = PLAN_NAMES[status.plan] ?? status.plan;
-      const isInactiveDowngrade =
-        status.effectivePlan !== status.plan &&
-        !["active", "trialing"].includes(status.subscriptionStatus);
-
-      let message: string;
-      if (isInactiveDowngrade) {
-        message =
-          `Your ${nominalPlanName} subscription is ${status.subscriptionStatus}. ` +
-          `You've been downgraded to the Free plan (${status.limit} messages/month) ` +
-          `and have reached the limit. Renew your subscription to restore full access.`;
-      } else {
-        message =
-          `You've used all ${status.limit} messages included in your ${effectivePlanName} plan this month. ` +
-          `Upgrade to continue.`;
-      }
-
       res.status(402).json({
         error: "Plan limit reached",
-        message,
+        message: `You've used all ${status.limit} messages included in your ${effectivePlanName} plan this month. Upgrade to continue.`,
         plan: status.plan,
         effectivePlan: status.effectivePlan,
         subscriptionStatus: status.subscriptionStatus,
@@ -59,8 +70,8 @@ export async function requirePlanLimits(
       return;
     }
   } catch {
-    // Non-fatal: if the usage check itself errors, let the request through
-    // rather than blocking all widget traffic due to a transient DB hiccup.
+    // Non-fatal: transient DB failure — let the request through rather than
+    // blocking all widget traffic during an outage.
   }
 
   next();

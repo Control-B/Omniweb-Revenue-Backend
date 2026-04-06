@@ -39,7 +39,10 @@ export interface MerchantInfo {
 export interface BillingStatus {
   plan: string;
   planName: string;
+  effectivePlan: string;
+  effectivePlanName: string;
   subscriptionStatus: string;
+  isSubscriptionActive: boolean;
   currentPeriodEnd: string | null;
   hasCustomer: boolean;
   usage: {

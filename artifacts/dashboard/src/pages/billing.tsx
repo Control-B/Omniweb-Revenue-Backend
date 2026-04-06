@@ -116,6 +116,16 @@ export default function Billing() {
         </Alert>
       )}
 
+      {isOnPaidPlan && !billing.isSubscriptionActive && billing.subscriptionStatus !== "past_due" && (
+        <Alert className="border-amber-400 bg-amber-50 dark:bg-amber-950/30">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-amber-700 dark:text-amber-300">
+            Your <strong>{billing.planName}</strong> subscription is <strong>{billing.subscriptionStatus}</strong>.
+            The AI widget is operating under the Free plan limits ({billing.usage.limit} messages/month) until you renew.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {!billing.stripeConfigured && (
         <Alert className="border-amber-400 bg-amber-50 dark:bg-amber-950/30">
           <AlertTriangle className="h-4 w-4 text-amber-600" />

@@ -131,13 +131,28 @@ router.get(
 
     const m = rows[0];
     const plan = m.plan ?? "free";
-    const limit = PLAN_LIMITS[plan] ?? 50;
-    const used = m.monthlyMessageCount ?? 0;
+    const subscriptionStatus = m.subscriptionStatus ?? "none";
+
+    // Mirror enforcement logic: inactive subscriptions use free-tier limits
+    const isSubscriptionActive = ["active", "trialing"].includes(subscriptionStatus);
+    const isPaidPlan = ["starter", "pro"].includes(plan);
+    const effectivePlan = isPaidPlan && !isSubscriptionActive ? "free" : plan;
+
+    const limit = PLAN_LIMITS[effectivePlan] ?? 50;
+
+    // Mirror period-reset logic: if stored period is before the current month, treat usage as 0
+    const now = new Date();
+    const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const storedPeriod = m.usagePeriodStart;
+    const used = storedPeriod && storedPeriod >= periodStart ? (m.monthlyMessageCount ?? 0) : 0;
 
     res.json({
       plan,
       planName: PLAN_NAMES[plan] ?? plan,
-      subscriptionStatus: m.subscriptionStatus ?? "none",
+      effectivePlan,
+      effectivePlanName: PLAN_NAMES[effectivePlan] ?? effectivePlan,
+      subscriptionStatus,
+      isSubscriptionActive,
       currentPeriodEnd: m.currentPeriodEnd?.toISOString() ?? null,
       hasCustomer: !!m.stripeCustomerId,
       usage: {
@@ -229,18 +244,12 @@ async function handleStripeEvent(event: { type: string; data: { object: Record<s
         status: string;
         current_period_end: number;
         customer: string;
+        metadata?: Record<string, string>;
         items?: { data?: Array<{ price?: { id: string } }> };
       };
       const customerId = sub.customer;
-
-      const rows = await db
-        .select({ id: merchantsTable.id })
-        .from(merchantsTable)
-        .where(eq(merchantsTable.stripeCustomerId, customerId))
-        .limit(1);
-
-      if (rows.length === 0) break;
-      const merchantId = rows[0].id;
+      const merchantId = await resolveMerchantIdFromSubscription(sub.id, customerId, sub.metadata);
+      if (!merchantId) break;
 
       const plan = getPlanFromPriceId(sub.items?.data?.[0]?.price?.id);
 
@@ -249,6 +258,7 @@ async function handleStripeEvent(event: { type: string; data: { object: Record<s
         .set({
           plan: plan as "free" | "starter" | "pro",
           subscriptionStatus: mapStripeStatus(sub.status),
+          stripeCustomerId: customerId,
           stripeSubscriptionId: sub.id,
           currentPeriodEnd: new Date(sub.current_period_end * 1000),
           updatedAt: new Date(),
@@ -264,20 +274,13 @@ async function handleStripeEvent(event: { type: string; data: { object: Record<s
         id: string;
         status: string;
         current_period_end: number;
-        metadata?: Record<string, string>;
         customer: string;
+        metadata?: Record<string, string>;
         items?: { data?: Array<{ price?: { id: string } }> };
       };
       const customerId = sub.customer;
-
-      const rows = await db
-        .select({ id: merchantsTable.id })
-        .from(merchantsTable)
-        .where(eq(merchantsTable.stripeCustomerId, customerId))
-        .limit(1);
-
-      if (rows.length === 0) break;
-      const merchantId = rows[0].id;
+      const merchantId = await resolveMerchantIdFromSubscription(sub.id, customerId, sub.metadata);
+      if (!merchantId) break;
 
       const plan = getPlanFromPriceId(sub.items?.data?.[0]?.price?.id);
 
@@ -286,6 +289,7 @@ async function handleStripeEvent(event: { type: string; data: { object: Record<s
         .set({
           plan: plan as "free" | "starter" | "pro",
           subscriptionStatus: mapStripeStatus(sub.status),
+          stripeCustomerId: customerId,
           stripeSubscriptionId: sub.id,
           currentPeriodEnd: new Date(sub.current_period_end * 1000),
           updatedAt: new Date(),
@@ -348,6 +352,53 @@ async function handleStripeEvent(event: { type: string; data: { object: Record<s
     default:
       logger.info({ type: event.type }, "Unhandled Stripe event");
   }
+}
+
+/**
+ * Resolve a merchant's internal ID from subscription webhook data.
+ *
+ * Resolution strategy (in order of reliability):
+ *   1. By existing stripeCustomerId in DB
+ *   2. By existing stripeSubscriptionId in DB (handles re-sent events)
+ *   3. By merchantId from subscription metadata (set during checkout)
+ *
+ * This also handles the first event after a checkout.session.completed
+ * has already stored the customerId on the merchant.
+ */
+async function resolveMerchantIdFromSubscription(
+  subscriptionId: string,
+  customerId: string,
+  metadata?: Record<string, string>,
+): Promise<string | null> {
+  // 1. By customerId
+  const byCustomer = await db
+    .select({ id: merchantsTable.id })
+    .from(merchantsTable)
+    .where(eq(merchantsTable.stripeCustomerId, customerId))
+    .limit(1);
+  if (byCustomer.length > 0) return byCustomer[0].id;
+
+  // 2. By subscriptionId (handles re-sent / re-created subscriptions)
+  const bySubscription = await db
+    .select({ id: merchantsTable.id })
+    .from(merchantsTable)
+    .where(eq(merchantsTable.stripeSubscriptionId, subscriptionId))
+    .limit(1);
+  if (bySubscription.length > 0) return bySubscription[0].id;
+
+  // 3. By metadata merchantId (set in checkout session metadata)
+  const metaMerchantId = metadata?.["merchantId"];
+  if (metaMerchantId) {
+    const byMeta = await db
+      .select({ id: merchantsTable.id })
+      .from(merchantsTable)
+      .where(eq(merchantsTable.id, metaMerchantId))
+      .limit(1);
+    if (byMeta.length > 0) return byMeta[0].id;
+  }
+
+  logger.warn({ subscriptionId, customerId }, "Could not resolve merchant from subscription event");
+  return null;
 }
 
 function mapStripeStatus(status: string): "none" | "trialing" | "active" | "past_due" | "canceled" | "incomplete" {
