@@ -9,43 +9,24 @@ import { logger } from "./lib/logger.js";
 
 const app: Express = express();
 
-const ALLOWED_HOSTNAME_SUFFIXES = [
-  ".myshopify.com",
-  ".shopify.com",
-  ".replit.dev",
-  ".replit.app",
-  ".spock.replit.dev",
-];
-
-const ALLOWED_EXACT_HOSTNAMES = new Set(["localhost", "127.0.0.1"]);
-
-function isOriginAllowed(origin: string): boolean {
-  let hostname: string;
-  try {
-    hostname = new URL(origin).hostname;
-  } catch {
-    return false;
-  }
-  if (ALLOWED_EXACT_HOSTNAMES.has(hostname)) return true;
-  return ALLOWED_HOSTNAME_SUFFIXES.some((suffix) => hostname === suffix.slice(1) || hostname.endsWith(suffix));
-}
-
+/**
+ * CORS strategy
+ * ─────────────
+ * All API endpoints are secured by the x-widget-api-key header + rate limiting.
+ * The widget is embedded on arbitrary merchant storefront domains (custom domains,
+ * myshopify.com subdomains, etc.), so we cannot allowlist by origin.
+ *
+ * Access-Control-Allow-Origin: * is safe here because:
+ *  • Every sensitive endpoint requires x-widget-api-key (not a cookie/session)
+ *  • credentials: false means cookies are not sent cross-origin
+ *  • Rate limiting provides an additional abuse-prevention layer
+ */
 app.use(
   cors({
-    origin: (origin, callback) => {
-      if (!origin) {
-        callback(null, true);
-        return;
-      }
-      if (isOriginAllowed(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error(`Origin ${origin} not allowed by CORS policy`));
-      }
-    },
+    origin: "*",
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "x-widget-api-key"],
-    credentials: true,
+    allowedHeaders: ["Content-Type", "x-widget-api-key"],
+    credentials: false,
   }),
 );
 
@@ -104,8 +85,10 @@ const voiceLimiter = rateLimit({
 
 app.use(globalLimiter);
 
+/* Widget static file — public, no API key required, CORS set in route handler */
 app.use(widgetFileRouter);
 
+/* Widget API surface — API key auth + per-endpoint rate limiting */
 app.use("/api/chat", chatLimiter, requireApiKey);
 app.use("/api/voice", voiceLimiter, requireApiKey);
 app.use("/api/voices", requireApiKey);
