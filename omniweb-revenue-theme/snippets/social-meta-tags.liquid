@@ -1,0 +1,56 @@
+{% comment %}
+  Open Graph and Twitter meta tags
+{% endcomment %}
+
+{% assign og_title = page_title | default: shop.name %}
+{% assign og_description = page_description | default: shop.description | default: shop.name %}
+{% assign og_url = canonical_url %}
+{% assign og_type = 'website' %}
+
+{% if request.page_type == 'product' %}
+  {% assign og_type = 'product' %}
+  {% assign og_title = product.title %}
+  {% assign og_description = product.description | strip_html | truncate: 200 %}
+  {% if product.featured_image %}
+    {% assign og_image = product.featured_image | image_url: width: 1200 %}
+  {% endif %}
+{% elsif request.page_type == 'collection' %}
+  {% assign og_title = collection.title %}
+  {% assign og_description = collection.description | strip_html | truncate: 200 %}
+  {% if collection.image %}
+    {% assign og_image = collection.image | image_url: width: 1200 %}
+  {% endif %}
+{% elsif request.page_type == 'article' %}
+  {% assign og_type = 'article' %}
+  {% assign og_title = article.title %}
+  {% assign og_description = article.excerpt_or_content | strip_html | truncate: 200 %}
+  {% if article.image %}
+    {% assign og_image = article.image | image_url: width: 1200 %}
+  {% endif %}
+{% elsif request.page_type == 'page' %}
+  {% assign og_title = page.title %}
+  {% assign og_description = page.content | strip_html | truncate: 200 %}
+{% endif %}
+
+{% unless og_image %}
+  {% if settings.logo %}
+    {% assign og_image = settings.logo | image_url: width: 1200 %}
+  {% endif %}
+{% endunless %}
+
+<meta property="og:site_name" content="{{ shop.name }}">
+<meta property="og:url" content="{{ og_url }}">
+<meta property="og:title" content="{{ og_title | escape }}">
+<meta property="og:type" content="{{ og_type }}">
+<meta property="og:description" content="{{ og_description | escape }}">
+{% if og_image %}
+  <meta property="og:image" content="https:{{ og_image }}">
+  <meta property="og:image:secure_url" content="https:{{ og_image }}">
+{% endif %}
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ og_title | escape }}">
+<meta name="twitter:description" content="{{ og_description | escape }}">
+{% if og_image %}
+  <meta name="twitter:image" content="https:{{ og_image }}">
+{% endif %}

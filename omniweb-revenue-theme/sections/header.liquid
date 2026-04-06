@@ -1,0 +1,161 @@
+<header class="header{% if settings.sticky_header %} header--sticky{% endif %}" id="shopify-section-header">
+  <div class="header__inner page-width">
+    <div class="header__logo">
+      {% if settings.logo != blank %}
+        <a href="{{ routes.root_url }}" class="header__logo-link">
+          <img
+            src="{{ settings.logo | image_url: width: 320 }}"
+            alt="{{ shop.name }}"
+            width="{{ settings.logo_max_width }}"
+            height="auto"
+            loading="eager"
+            class="header__logo-image"
+          >
+        </a>
+      {% else %}
+        <a href="{{ routes.root_url }}" class="header__logo-text">
+          {{ shop.name }}
+        </a>
+      {% endif %}
+    </div>
+
+    <nav class="header__nav" aria-label="Main navigation">
+      <ul class="header__nav-list list-unstyled" role="list">
+        {% for link in section.settings.menu.links %}
+          <li class="header__nav-item{% if link.links != blank %} header__nav-item--has-dropdown{% endif %}">
+            <a
+              href="{{ link.url }}"
+              class="header__nav-link{% if link.active %} header__nav-link--active{% endif %}"
+              {% if link.links != blank %}aria-expanded="false" aria-haspopup="true"{% endif %}
+            >
+              {{ link.title }}
+              {% if link.links != blank %}
+                <svg class="icon icon-chevron-down" viewBox="0 0 20 20" width="12" height="12" aria-hidden="true">
+                  <path d="M5 7l5 5 5-5"/>
+                </svg>
+              {% endif %}
+            </a>
+            {% if link.links != blank %}
+              <ul class="header__dropdown list-unstyled" role="list">
+                {% for child_link in link.links %}
+                  <li>
+                    <a href="{{ child_link.url }}" class="header__dropdown-link{% if child_link.active %} active{% endif %}">
+                      {{ child_link.title }}
+                    </a>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    </nav>
+
+    <div class="header__actions">
+      {% if settings.show_search %}
+        <button class="header__icon-btn js-search-toggle" aria-label="Search">
+          <svg class="icon icon-search" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="m21 21-4.35-4.35"/>
+          </svg>
+        </button>
+      {% endif %}
+
+      <a href="{{ routes.account_url }}" class="header__icon-btn" aria-label="Account">
+        <svg class="icon icon-account" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
+      </a>
+
+      <button class="header__icon-btn header__cart-btn js-cart-toggle" aria-label="Cart" data-cart-count="{{ cart.item_count }}">
+        <svg class="icon icon-cart" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <path d="M16 10a4 4 0 0 1-8 0"/>
+        </svg>
+        <span class="header__cart-count js-cart-count" {% if cart.item_count == 0 %}aria-hidden="true"{% endif %}>
+          {{ cart.item_count }}
+        </span>
+      </button>
+
+      <button class="header__mobile-menu-btn js-mobile-menu-toggle" aria-label="Open menu" aria-expanded="false">
+        <svg class="icon icon-menu" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  {% if settings.show_search %}
+    <div class="header__search-bar js-search-bar" hidden>
+      <div class="page-width">
+        <form action="{{ routes.search_url }}" method="get" role="search" class="header__search-form">
+          <input type="hidden" name="type" value="product">
+          <input
+            class="header__search-input"
+            type="search"
+            name="q"
+            placeholder="Search products..."
+            aria-label="Search products"
+            autocomplete="off"
+          >
+          <button type="submit" class="header__search-submit" aria-label="Submit search">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/>
+              <path d="m21 21-4.35-4.35"/>
+            </svg>
+          </button>
+          <button type="button" class="header__search-close js-search-toggle" aria-label="Close search">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 6 6 18M6 6l12 12"/>
+            </svg>
+          </button>
+        </form>
+      </div>
+    </div>
+  {% endif %}
+
+  <nav class="header__mobile-nav js-mobile-nav" aria-label="Mobile navigation" aria-hidden="true">
+    <div class="header__mobile-nav-inner">
+      <button class="header__mobile-nav-close js-mobile-menu-toggle" aria-label="Close menu">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 6 6 18M6 6l12 12"/>
+        </svg>
+      </button>
+      <ul class="header__mobile-nav-list list-unstyled" role="list">
+        {% for link in section.settings.menu.links %}
+          <li class="header__mobile-nav-item">
+            <a href="{{ link.url }}" class="header__mobile-nav-link">{{ link.title }}</a>
+            {% if link.links != blank %}
+              <ul class="header__mobile-dropdown list-unstyled" role="list">
+                {% for child_link in link.links %}
+                  <li>
+                    <a href="{{ child_link.url }}" class="header__mobile-dropdown-link">{{ child_link.title }}</a>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </nav>
+</header>
+
+{% schema %}
+{
+  "name": "Header",
+  "limit": 1,
+  "settings": [
+    {
+      "type": "link_list",
+      "id": "menu",
+      "label": "Navigation menu",
+      "default": "main-menu"
+    }
+  ]
+}
+{% endschema %}

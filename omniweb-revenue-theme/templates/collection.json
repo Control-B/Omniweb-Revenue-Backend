@@ -1,0 +1,25 @@
+{
+  "sections": {
+    "main": {
+      "type": "main-collection",
+      "settings": {
+        "products_per_page": 24,
+        "columns_desktop": "4"
+      }
+    },
+    "collection-faq": {
+      "type": "faq",
+      "settings": {
+        "title": "Shopping Questions",
+        "subtitle": "",
+        "background_color": "#F8F8F8"
+      },
+      "blocks": {
+        "q1": { "type": "question", "settings": { "question": "What is your return policy?", "answer": "<p>30-day hassle-free returns on all orders.</p>" } },
+        "q2": { "type": "question", "settings": { "question": "Do you offer free shipping?", "answer": "<p>Yes! Free standard shipping on all orders over $75.</p>" } }
+      },
+      "block_order": ["q1", "q2"]
+    }
+  },
+  "order": ["main", "collection-faq"]
+}

@@ -1,0 +1,196 @@
+<section class="testimonials section-padding" style="background-color: {{ section.settings.background_color }};">
+  <div class="page-width">
+    <div class="section-header animate-on-scroll">
+      {% if section.settings.title != blank %}
+        <h2 class="section-title" style="color: {{ section.settings.text_color }};">{{ section.settings.title }}</h2>
+      {% endif %}
+      {% if section.settings.subtitle != blank %}
+        <p class="section-subtitle" style="color: {{ section.settings.text_color }};">{{ section.settings.subtitle }}</p>
+      {% endif %}
+      {% if section.settings.show_aggregate %}
+        <div class="testimonials__aggregate">
+          {% render 'stars', rating: 5 %}
+          <span class="testimonials__aggregate-text" style="color: {{ section.settings.text_color }};">
+            {{ section.settings.aggregate_text | default: '4.9 out of 5 based on 2,400+ reviews' }}
+          </span>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="testimonials__grid">
+      {% for block in section.blocks %}
+        {% if block.type == 'testimonial' %}
+          <div class="testimonial-card animate-on-scroll" {{ block.shopify_attributes }}>
+            <div class="testimonial-card__rating">
+              {% assign rating = block.settings.rating | default: 5 %}
+              {% render 'stars', rating: rating %}
+            </div>
+            {% if block.settings.quote != blank %}
+              <blockquote class="testimonial-card__quote">
+                "{{ block.settings.quote }}"
+              </blockquote>
+            {% endif %}
+            <div class="testimonial-card__author">
+              {% if block.settings.avatar != blank %}
+                <img
+                  src="{{ block.settings.avatar | image_url: width: 80 }}"
+                  alt="{{ block.settings.author }}"
+                  class="testimonial-card__avatar"
+                  width="40"
+                  height="40"
+                  loading="lazy"
+                >
+              {% else %}
+                <div class="testimonial-card__avatar-placeholder">
+                  {{ block.settings.author | slice: 0, 1 | upcase }}
+                </div>
+              {% endif %}
+              <div class="testimonial-card__author-info">
+                {% if block.settings.author != blank %}
+                  <span class="testimonial-card__author-name">{{ block.settings.author }}</span>
+                {% endif %}
+                {% if block.settings.location != blank %}
+                  <span class="testimonial-card__author-location">{{ block.settings.location }}</span>
+                {% endif %}
+                {% if block.settings.verified %}
+                  <span class="testimonial-card__verified">
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+                      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                    </svg>
+                    Verified buyer
+                  </span>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Testimonials",
+  "settings": [
+    {
+      "type": "text",
+      "id": "title",
+      "label": "Heading",
+      "default": "What Our Customers Say"
+    },
+    {
+      "type": "text",
+      "id": "subtitle",
+      "label": "Subheading",
+      "default": "Join thousands of happy customers who trust us."
+    },
+    {
+      "type": "checkbox",
+      "id": "show_aggregate",
+      "label": "Show aggregate rating",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "aggregate_text",
+      "label": "Aggregate rating text",
+      "default": "4.9 out of 5 based on 2,400+ reviews"
+    },
+    {
+      "type": "color",
+      "id": "background_color",
+      "label": "Background color",
+      "default": "#FFFFFF"
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "Text color",
+      "default": "#1A1A1A"
+    }
+  ],
+  "blocks": [
+    {
+      "type": "testimonial",
+      "name": "Testimonial",
+      "settings": [
+        {
+          "type": "select",
+          "id": "rating",
+          "label": "Star rating",
+          "options": [
+            { "value": "5", "label": "5 stars" },
+            { "value": "4", "label": "4 stars" },
+            { "value": "3", "label": "3 stars" }
+          ],
+          "default": "5"
+        },
+        {
+          "type": "textarea",
+          "id": "quote",
+          "label": "Review text",
+          "default": "Absolutely love this product. The quality is exceptional and it arrived faster than expected. Will definitely be ordering again!"
+        },
+        {
+          "type": "text",
+          "id": "author",
+          "label": "Customer name",
+          "default": "Sarah M."
+        },
+        {
+          "type": "text",
+          "id": "location",
+          "label": "Location",
+          "default": "New York, NY"
+        },
+        {
+          "type": "image_picker",
+          "id": "avatar",
+          "label": "Customer photo"
+        },
+        {
+          "type": "checkbox",
+          "id": "verified",
+          "label": "Show \"Verified buyer\" badge",
+          "default": true
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Testimonials",
+      "blocks": [
+        {
+          "type": "testimonial",
+          "settings": {
+            "quote": "This is hands-down the best purchase I've made all year. The quality exceeded my expectations and customer service was outstanding.",
+            "author": "James T.",
+            "location": "Austin, TX",
+            "verified": true
+          }
+        },
+        {
+          "type": "testimonial",
+          "settings": {
+            "quote": "I was skeptical at first but wow — this product is exactly as described. Fast shipping, beautiful packaging, and it works perfectly.",
+            "author": "Maria L.",
+            "location": "Los Angeles, CA",
+            "verified": true
+          }
+        },
+        {
+          "type": "testimonial",
+          "settings": {
+            "quote": "My whole family loves it. We've already bought three more as gifts. The value for money is unbeatable. Highly recommend!",
+            "author": "David K.",
+            "location": "Chicago, IL",
+            "verified": true
+          }
+        }
+      ]
+    }
+  ]
+}
+{% endschema %}

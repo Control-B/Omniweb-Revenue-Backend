@@ -1,0 +1,76 @@
+{
+  "general": {
+    "search": {
+      "search": "Search",
+      "search_for": "Search for",
+      "no_results_html": "No results found for \"{{ terms }}\"."
+    },
+    "pagination": {
+      "previous": "Previous",
+      "next": "Next",
+      "current_page": "Page {{ page }} of {{ total }}"
+    },
+    "accessibility": {
+      "skip_to_content": "Skip to content",
+      "close_modal": "Close dialog"
+    }
+  },
+  "sections": {
+    "header": {
+      "menu": "Menu",
+      "cart": "Cart ({{ count }})",
+      "account": "Account",
+      "log_out": "Log out",
+      "log_in": "Log in"
+    },
+    "cart": {
+      "title": "Your cart",
+      "empty": "Your cart is empty",
+      "continue_shopping": "Continue shopping",
+      "subtotal": "Subtotal",
+      "taxes": "Taxes and shipping calculated at checkout",
+      "checkout": "Checkout",
+      "remove": "Remove",
+      "cart_error": "There was an error updating your cart.",
+      "cart_quantity_error_html": "Only [quantity] left in stock."
+    },
+    "footer": {
+      "copyright": "© {{ year }} {{ shop_name }}"
+    }
+  },
+  "products": {
+    "product": {
+      "add_to_cart": "Add to cart",
+      "sold_out": "Sold out",
+      "unavailable": "Unavailable",
+      "view_full_details": "View full details",
+      "quantity": "Quantity",
+      "pick_variant": "Choose {{ option }}",
+      "vendor": "By {{ vendor }}",
+      "sku": "SKU: {{ sku }}",
+      "compare_at_price": "Was {{ price }}",
+      "from_price": "From {{ price }}",
+      "on_sale": "Sale"
+    },
+    "facets": {
+      "filter_by": "Filter",
+      "sort_by_label": "Sort",
+      "sort_options": {
+        "manual": "Featured",
+        "best-selling": "Best selling",
+        "title-ascending": "A-Z",
+        "title-descending": "Z-A",
+        "price-ascending": "Price: Low to High",
+        "price-descending": "Price: High to Low",
+        "created-ascending": "Oldest first",
+        "created-descending": "Newest first"
+      },
+      "clear_all": "Clear all",
+      "apply": "Apply",
+      "product_count": "{{ product_count }} products"
+    }
+  },
+  "accessibility": {
+    "star_reviews_info": "{{ rating_value }} of {{ rating_max }} stars"
+  }
+}

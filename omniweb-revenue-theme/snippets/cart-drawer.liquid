@@ -1,0 +1,95 @@
+{% comment %}Cart drawer — rendered in theme.liquid{% endcomment %}
+
+<div class="cart-drawer js-cart-drawer" id="cart-drawer" aria-label="Shopping cart" aria-hidden="true" role="dialog">
+  <div class="cart-drawer__overlay js-cart-close" tabindex="-1"></div>
+  <div class="cart-drawer__panel">
+    <div class="cart-drawer__header">
+      <h2 class="cart-drawer__title">{{ 'sections.cart.title' | t }} (<span class="js-cart-count">{{ cart.item_count }}</span>)</h2>
+      <button class="cart-drawer__close js-cart-close" aria-label="Close cart">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 6 6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="cart-drawer__body js-cart-drawer-body">
+      {% if cart.item_count == 0 %}
+        <div class="cart-drawer__empty">
+          <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1">
+            <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <path d="M16 10a4 4 0 0 1-8 0"/>
+          </svg>
+          <p>{{ 'sections.cart.empty' | t }}</p>
+          <a href="{{ routes.all_products_collection_url }}" class="btn btn--primary js-cart-close">{{ 'sections.cart.continue_shopping' | t }}</a>
+        </div>
+      {% else %}
+        <ul class="cart-drawer__items list-unstyled js-cart-items" role="list">
+          {% for item in cart.items %}
+            <li class="cart-drawer__item" data-key="{{ item.key }}">
+              <a href="{{ item.url }}" class="cart-drawer__item-image-link" tabindex="-1">
+                {% if item.image %}
+                  <img
+                    src="{{ item.image | image_url: width: 160 }}"
+                    alt="{{ item.image.alt | escape }}"
+                    class="cart-drawer__item-image"
+                    loading="lazy"
+                    width="80"
+                    height="80"
+                  >
+                {% endif %}
+              </a>
+              <div class="cart-drawer__item-details">
+                <div class="cart-drawer__item-header">
+                  <a href="{{ item.url }}" class="cart-drawer__item-title">{{ item.product.title }}</a>
+                  <span class="cart-drawer__item-price">{{ item.final_price | money }}</span>
+                </div>
+                {% unless item.product.has_only_default_variant %}
+                  <p class="cart-drawer__item-variant">{{ item.variant.title }}</p>
+                {% endunless %}
+                <div class="cart-drawer__item-controls">
+                  <div class="quantity-selector quantity-selector--sm">
+                    <button type="button" class="quantity-selector__btn js-cart-qty" data-key="{{ item.key }}" data-action="decrease">−</button>
+                    <input type="number" class="quantity-selector__input js-cart-qty-input" value="{{ item.quantity }}" min="0" data-key="{{ item.key }}" aria-label="Quantity">
+                    <button type="button" class="quantity-selector__btn js-cart-qty" data-key="{{ item.key }}" data-action="increase">+</button>
+                  </div>
+                  <button type="button" class="cart-drawer__remove js-cart-remove" data-key="{{ item.key }}" aria-label="Remove item">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+
+    {% if cart.item_count > 0 %}
+      <div class="cart-drawer__footer">
+        {% if cart.cart_level_discount_applications.size > 0 %}
+          <div class="cart-drawer__discounts">
+            {% for discount in cart.cart_level_discount_applications %}
+              <div class="cart-drawer__discount">
+                <span>{{ discount.title }}</span>
+                <span>-{{ discount.total_allocated_amount | money }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        <div class="cart-drawer__subtotal">
+          <span>{{ 'sections.cart.subtotal' | t }}</span>
+          <strong class="js-cart-total">{{ cart.total_price | money }}</strong>
+        </div>
+        <p class="cart-drawer__taxes">{{ 'sections.cart.taxes' | t }}</p>
+
+        <a href="{{ routes.checkout }}" class="btn btn--primary btn--full btn--large cart-drawer__checkout">
+          {{ 'sections.cart.checkout' | t }}
+        </a>
+        <a href="{{ routes.cart_url }}" class="cart-drawer__view-cart">View cart</a>
+      </div>
+    {% endif %}
+  </div>
+</div>

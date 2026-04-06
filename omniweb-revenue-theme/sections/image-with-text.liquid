@@ -1,0 +1,131 @@
+<section class="image-with-text section-padding" style="background-color: {{ section.settings.background_color }};">
+  <div class="page-width">
+    <div class="image-with-text__grid image-with-text__grid--{{ section.settings.image_position }}">
+      <div class="image-with-text__media animate-on-scroll">
+        {% if section.settings.image != blank %}
+          <img
+            src="{{ section.settings.image | image_url: width: 900 }}"
+            srcset="{{ section.settings.image | image_url: width: 600 }} 600w, {{ section.settings.image | image_url: width: 900 }} 900w"
+            sizes="(min-width: 900px) 50vw, 100vw"
+            alt="{{ section.settings.image.alt | escape }}"
+            class="image-with-text__image"
+            loading="lazy"
+            width="{{ section.settings.image.width }}"
+            height="{{ section.settings.image.height }}"
+          >
+        {% else %}
+          <div class="image-with-text__image image-with-text__image--placeholder"></div>
+        {% endif %}
+      </div>
+
+      <div class="image-with-text__content animate-on-scroll">
+        {% if section.settings.eyebrow != blank %}
+          <p class="image-with-text__eyebrow">{{ section.settings.eyebrow }}</p>
+        {% endif %}
+        {% if section.settings.title != blank %}
+          <h2 class="image-with-text__title">{{ section.settings.title }}</h2>
+        {% endif %}
+        {% if section.settings.text != blank %}
+          <div class="image-with-text__text rte">{{ section.settings.text }}</div>
+        {% endif %}
+        {% for block in section.blocks %}
+          {% if block.type == 'feature' %}
+            <div class="image-with-text__feature" {{ block.shopify_attributes }}>
+              <svg class="image-with-text__feature-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              <span>{{ block.settings.text }}</span>
+            </div>
+          {% endif %}
+        {% endfor %}
+        {% if section.settings.btn_label != blank %}
+          <a href="{{ section.settings.btn_url }}" class="btn btn--primary image-with-text__btn">
+            {{ section.settings.btn_label }}
+          </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Image with text",
+  "settings": [
+    {
+      "type": "image_picker",
+      "id": "image",
+      "label": "Image"
+    },
+    {
+      "type": "select",
+      "id": "image_position",
+      "label": "Image position",
+      "options": [
+        { "value": "left", "label": "Left" },
+        { "value": "right", "label": "Right" }
+      ],
+      "default": "left"
+    },
+    {
+      "type": "text",
+      "id": "eyebrow",
+      "label": "Eyebrow label",
+      "default": "Our Story"
+    },
+    {
+      "type": "text",
+      "id": "title",
+      "label": "Heading",
+      "default": "Built to Last. Designed to Impress."
+    },
+    {
+      "type": "richtext",
+      "id": "text",
+      "label": "Body text",
+      "default": "<p>We craft every product with the finest materials and meticulous attention to detail. Our commitment to quality means you get something that not only looks great but stands the test of time.</p>"
+    },
+    {
+      "type": "text",
+      "id": "btn_label",
+      "label": "Button label",
+      "default": "Learn more"
+    },
+    {
+      "type": "url",
+      "id": "btn_url",
+      "label": "Button link"
+    },
+    {
+      "type": "color",
+      "id": "background_color",
+      "label": "Background color",
+      "default": "#FFFFFF"
+    }
+  ],
+  "blocks": [
+    {
+      "type": "feature",
+      "name": "Feature point",
+      "settings": [
+        {
+          "type": "text",
+          "id": "text",
+          "label": "Feature text",
+          "default": "Premium quality materials"
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Image with text",
+      "blocks": [
+        { "type": "feature", "settings": { "text": "Sustainably sourced materials" } },
+        { "type": "feature", "settings": { "text": "Lifetime craftsmanship warranty" } },
+        { "type": "feature", "settings": { "text": "Certified carbon neutral" } }
+      ]
+    }
+  ]
+}
+{% endschema %}

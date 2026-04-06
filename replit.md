@@ -4,6 +4,15 @@
 
 pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
 
+## Shopify Theme
+
+A complete Shopify Online Store 2.0 theme (`omniweb-revenue-theme/`) is included:
+- 40 files, ~206 KB total
+- Layout, templates (JSON), sections, snippets, assets, config, locales
+- Full product page, collection page, cart drawer, FAQ, testimonials, trust badges, upsell
+- Vanilla JS (no dependencies), fully mobile responsive
+- Shopify CLI compatible — see `omniweb-revenue-theme/README.md`
+
 ## Stack
 
 - **Monorepo tool**: pnpm workspaces

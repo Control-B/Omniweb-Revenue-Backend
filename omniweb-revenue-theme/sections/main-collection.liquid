@@ -1,0 +1,169 @@
+<div class="collection-page">
+  <div class="collection-page__header">
+    <div class="page-width">
+      {% unless collection.handle == 'frontpage' %}
+        <nav class="breadcrumbs" aria-label="Breadcrumb">
+          <ol class="breadcrumbs__list list-unstyled" role="list">
+            <li class="breadcrumbs__item"><a href="{{ routes.root_url }}" class="breadcrumbs__link">Home</a></li>
+            <li class="breadcrumbs__item breadcrumbs__item--separator" aria-hidden="true">›</li>
+            <li class="breadcrumbs__item"><span>{{ collection.title }}</span></li>
+          </ol>
+        </nav>
+      {% endunless %}
+
+      <div class="collection-page__title-row">
+        <h1 class="collection-page__title">{{ collection.title }}</h1>
+        <span class="collection-page__count">
+          {{ collection.products_count }} {{ 'products.facets.product_count' | t: product_count: collection.products_count }}
+        </span>
+      </div>
+      {% if collection.description != blank %}
+        <div class="collection-page__description rte">{{ collection.description }}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="page-width">
+    <div class="collection-page__toolbar">
+      <button class="collection-page__filter-toggle js-filter-toggle btn btn--secondary" aria-expanded="false">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="4" y1="6" x2="16" y2="6"/>
+          <line x1="8" y1="12" x2="20" y2="12"/>
+          <line x1="4" y1="18" x2="12" y2="18"/>
+        </svg>
+        {{ 'products.facets.filter_by' | t }}
+      </button>
+
+      <div class="collection-page__sort">
+        <label for="sort-by" class="visually-hidden">{{ 'products.facets.sort_by_label' | t }}</label>
+        <select id="sort-by" name="sort_by" class="sort-select js-sort-by" aria-label="{{ 'products.facets.sort_by_label' | t }}">
+          <option value="manual" {% if collection.sort_by == 'manual' %}selected{% endif %}>{{ 'products.facets.sort_options.manual' | t }}</option>
+          <option value="best-selling" {% if collection.sort_by == 'best-selling' %}selected{% endif %}>{{ 'products.facets.sort_options.best-selling' | t }}</option>
+          <option value="title-ascending" {% if collection.sort_by == 'title-ascending' %}selected{% endif %}>{{ 'products.facets.sort_options.title-ascending' | t }}</option>
+          <option value="title-descending" {% if collection.sort_by == 'title-descending' %}selected{% endif %}>{{ 'products.facets.sort_options.title-descending' | t }}</option>
+          <option value="price-ascending" {% if collection.sort_by == 'price-ascending' %}selected{% endif %}>{{ 'products.facets.sort_options.price-ascending' | t }}</option>
+          <option value="price-descending" {% if collection.sort_by == 'price-descending' %}selected{% endif %}>{{ 'products.facets.sort_options.price-descending' | t }}</option>
+          <option value="created-descending" {% if collection.sort_by == 'created-descending' %}selected{% endif %}>{{ 'products.facets.sort_options.created-descending' | t }}</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="collection-page__layout">
+      <!-- Filter Sidebar -->
+      <aside class="collection-filters js-filter-sidebar" aria-label="Product filters">
+        {% for filter in collection.filters %}
+          <div class="filter-group">
+            <button class="filter-group__header js-filter-toggle-group" aria-expanded="true">
+              {{ filter.label }}
+              <svg class="filter-group__chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="18 15 12 9 6 15"/>
+              </svg>
+            </button>
+            <div class="filter-group__body">
+              {% case filter.type %}
+                {% when 'boolean', 'list' %}
+                  <ul class="filter-group__list list-unstyled" role="list">
+                    {% for filter_value in filter.values %}
+                      <li class="filter-group__item">
+                        <label class="filter-checkbox">
+                          <input
+                            type="checkbox"
+                            name="{{ filter_value.param_name }}"
+                            value="{{ filter_value.value }}"
+                            {% if filter_value.active %}checked{% endif %}
+                            class="filter-checkbox__input js-filter-checkbox"
+                          >
+                          <span class="filter-checkbox__label">
+                            {{ filter_value.label }}
+                            <span class="filter-checkbox__count">({{ filter_value.count }})</span>
+                          </span>
+                        </label>
+                      </li>
+                    {% endfor %}
+                  </ul>
+                {% when 'price_range' %}
+                  <div class="filter-price-range">
+                    <div class="filter-price-range__inputs">
+                      <input
+                        type="number"
+                        name="{{ filter.min_value.param_name }}"
+                        placeholder="Min"
+                        value="{{ filter.min_value.value | money_without_currency | replace: ',', '' }}"
+                        class="filter-price-range__input"
+                        min="0"
+                        max="{{ filter.range_max | money_without_currency | replace: ',', '' }}"
+                      >
+                      <span>–</span>
+                      <input
+                        type="number"
+                        name="{{ filter.max_value.param_name }}"
+                        placeholder="Max"
+                        value="{{ filter.max_value.value | money_without_currency | replace: ',', '' }}"
+                        class="filter-price-range__input"
+                        min="0"
+                        max="{{ filter.range_max | money_without_currency | replace: ',', '' }}"
+                      >
+                    </div>
+                    <button class="btn btn--secondary btn--sm js-price-filter-apply">Apply</button>
+                  </div>
+              {% endcase %}
+            </div>
+          </div>
+        {% endfor %}
+
+        {% if collection.filters.size > 0 %}
+          <a href="{{ collection.url }}" class="filter-clear-all">
+            {{ 'products.facets.clear_all' | t }}
+          </a>
+        {% endif %}
+      </aside>
+
+      <!-- Product Grid -->
+      <div class="collection-page__products">
+        {% paginate collection.products by section.settings.products_per_page %}
+          <div class="product-grid product-grid--{{ section.settings.columns_desktop }}-col js-product-grid" id="product-grid">
+            {% for product in collection.products %}
+              {% render 'product-card', product: product %}
+            {% else %}
+              <p class="collection-page__no-results">No products found. <a href="{{ collection.url }}">Reset filters</a></p>
+            {% endfor %}
+          </div>
+
+          {% if paginate.pages > 1 %}
+            <div class="collection-page__pagination">
+              {{ paginate | default_pagination: anchor: 'product-grid' }}
+            </div>
+          {% endif %}
+        {% endpaginate %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Collection products",
+  "settings": [
+    {
+      "type": "range",
+      "id": "products_per_page",
+      "label": "Products per page",
+      "min": 8,
+      "max": 48,
+      "step": 4,
+      "default": 24
+    },
+    {
+      "type": "select",
+      "id": "columns_desktop",
+      "label": "Columns on desktop",
+      "options": [
+        { "value": "2", "label": "2 columns" },
+        { "value": "3", "label": "3 columns" },
+        { "value": "4", "label": "4 columns" }
+      ],
+      "default": "4"
+    }
+  ]
+}
+{% endschema %}
