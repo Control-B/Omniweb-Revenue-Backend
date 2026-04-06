@@ -27,6 +27,7 @@ if (!rawPort) {
 }
 
 const port = Number(rawPort);
+const host = process.env["HOST"] ?? "0.0.0.0";
 
 if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
@@ -43,13 +44,13 @@ async function start(): Promise<void> {
   }
 
   await new Promise<void>((resolve, reject) => {
-    app.listen(port, (err) => {
+    app.listen(port, host, (err) => {
       if (err) {
         logger.error({ err }, "Error listening on port");
         reject(err);
         return;
       }
-      logger.info({ port }, "Server listening");
+      logger.info({ host, port }, "Server listening");
       resolve();
     });
   });
