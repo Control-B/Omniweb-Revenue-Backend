@@ -6,6 +6,8 @@ import { eq, and, isNotNull } from "drizzle-orm";
 import { signToken } from "../lib/jwt.js";
 import { requireSessionAuth, hashApiKey } from "../middleware/api-key.js";
 import { logger } from "../lib/logger.js";
+import { getClerkClient, isClerkConfigured, verifyClerkSessionToken } from "../lib/clerk.js";
+import { upsertMerchantFromClerk } from "../lib/merchant-auth.js";
 
 const router: IRouter = Router();
 
@@ -30,6 +32,13 @@ function setSessionCookie(res: Response, token: string): void {
 function clearSessionCookie(res: Response): void {
   res.clearCookie(SESSION_COOKIE, { path: "/" });
 }
+
+router.get("/auth/providers", (_req: Request, res: Response): void => {
+  res.json({
+    clerkEnabled: isClerkConfigured(),
+    legacyPasswordEnabled: true,
+  });
+});
 
 router.post("/auth/signup", async (req: Request, res: Response): Promise<void> => {
   const { email, shopId, password } = req.body as {
@@ -195,11 +204,72 @@ router.post("/auth/logout", (_req: Request, res: Response): void => {
   res.json({ message: "Logged out" });
 });
 
+router.post("/auth/clerk/sync", async (req: Request, res: Response): Promise<void> => {
+  if (!isClerkConfigured()) {
+    res.status(503).json({ error: "Clerk is not configured" });
+    return;
+  }
+
+  const authHeader = req.headers["authorization"];
+  if (!authHeader?.startsWith("Bearer ")) {
+    res.status(401).json({ error: "Missing Clerk session token" });
+    return;
+  }
+
+  try {
+    const token = authHeader.slice(7);
+    const clerkClient = getClerkClient();
+    const claims = await verifyClerkSessionToken(token);
+    const clerkUserId = claims?.clerkUserId ?? null;
+
+    if (!clerkUserId) {
+      res.status(401).json({ error: "Invalid Clerk session token" });
+      return;
+    }
+
+    const user = await clerkClient.users.getUser(clerkUserId);
+    const primaryEmail = user.emailAddresses.find((address) => address.id === user.primaryEmailAddressId)
+      ?? user.emailAddresses[0];
+
+    if (!primaryEmail?.emailAddress) {
+      res.status(400).json({ error: "Clerk user does not have a verified email" });
+      return;
+    }
+
+    const { shopId } = req.body as { shopId?: string };
+    const merchant = await upsertMerchantFromClerk({
+      clerkUserId,
+      email: primaryEmail.emailAddress,
+    }, shopId);
+
+    const sessionToken = signToken({
+      merchantId: merchant.id,
+      shopId: merchant.shopId,
+      email: merchant.email,
+    });
+
+    setSessionCookie(res, sessionToken);
+
+    logger.info({ merchantId: merchant.id, clerkUserId }, "Clerk user synced to merchant account");
+    res.json({
+      merchantId: merchant.id,
+      shopId: merchant.shopId,
+      email: merchant.email,
+      plan: merchant.plan,
+      onboardingComplete: Boolean(merchant.shopId),
+    });
+  } catch (err) {
+    logger.error({ err }, "Clerk sync error");
+    res.status(500).json({ error: err instanceof Error ? err.message : "Clerk sync failed" });
+  }
+});
+
 router.get("/auth/me", requireSessionAuth, async (req: Request, res: Response): Promise<void> => {
   const merchant = req.merchant!;
   const rows = await db
     .select({
       plan: merchantsTable.plan,
+      clerkUserId: merchantsTable.clerkUserId,
       apiKeyPrefix: merchantsTable.apiKeyPrefix,
       apiKeyCreatedAt: merchantsTable.apiKeyCreatedAt,
       createdAt: merchantsTable.createdAt,
@@ -218,6 +288,7 @@ router.get("/auth/me", requireSessionAuth, async (req: Request, res: Response): 
     shopId: merchant.shopId,
     email: merchant.email,
     plan: rows[0].plan,
+    authProvider: rows[0].clerkUserId ? "clerk" : "legacy",
     apiKeyPrefix: rows[0].apiKeyPrefix,
     apiKeyCreatedAt: rows[0].apiKeyCreatedAt,
     createdAt: rows[0].createdAt,

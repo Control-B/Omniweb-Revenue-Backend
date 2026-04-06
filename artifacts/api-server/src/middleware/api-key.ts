@@ -3,6 +3,8 @@ import { createHash } from "crypto";
 import { db, merchantsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { verifyToken } from "../lib/jwt.js";
+import { verifyClerkSessionToken } from "../lib/clerk.js";
+import { findMerchantByClerkUserId } from "../lib/merchant-auth.js";
 
 declare global {
   namespace Express {
@@ -36,6 +38,25 @@ async function resolveFromApiKey(key: string): Promise<Request["merchant"] | nul
   return rows[0] ?? null;
 }
 
+async function resolveFromClerk(token: string): Promise<Request["merchant"] | null> {
+  const payload = await verifyClerkSessionToken(token);
+  if (!payload) {
+    return null;
+  }
+
+  const merchant = await findMerchantByClerkUserId(payload.clerkUserId);
+  if (!merchant) {
+    return null;
+  }
+
+  return {
+    id: merchant.id,
+    shopId: merchant.shopId,
+    email: merchant.email,
+    plan: merchant.plan,
+  };
+}
+
 function resolveFromJwt(token: string): Request["merchant"] | null {
   try {
     const payload = verifyToken(token);
@@ -58,6 +79,16 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   const authHeader = req.headers["authorization"];
   const apiKey = req.headers["x-widget-api-key"] as string | undefined;
   const sessionCookie = (req.cookies as Record<string, string | undefined>)["ow_session"];
+
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.slice(7);
+    const clerkMerchant = await resolveFromClerk(token);
+    if (clerkMerchant) {
+      req.merchant = clerkMerchant;
+      next();
+      return;
+    }
+  }
 
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.slice(7);
@@ -95,7 +126,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
  * Apply to sensitive account-management endpoints (profile, key rotation) where
  * API key possession must not be sufficient to modify account credentials.
  */
-export function requireSessionAuth(req: Request, res: Response, next: NextFunction): void {
+export async function requireSessionAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers["authorization"];
   const sessionCookie = (req.cookies as Record<string, string | undefined>)["ow_session"];
 
@@ -110,6 +141,13 @@ export function requireSessionAuth(req: Request, res: Response, next: NextFuncti
 
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.slice(7);
+    const clerkMerchant = await resolveFromClerk(token);
+    if (clerkMerchant) {
+      req.merchant = clerkMerchant;
+      next();
+      return;
+    }
+
     const merchant = resolveFromJwt(token);
     if (merchant) {
       req.merchant = merchant;

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { SignUpButton } from "@clerk/clerk-react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { makeZodResolver } from "@/lib/zod-form-resolver";
@@ -9,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
 import { LayoutDashboard, Loader2, Key, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 
@@ -31,7 +33,7 @@ interface PendingSession {
 }
 
 export default function Signup() {
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, isClerkEnabled } = useAuth();
   const [, setLocation] = useLocation();
   const [isLoading, setIsLoading] = useState(false);
   const [pending, setPending] = useState<PendingSession | null>(null);
@@ -52,6 +54,8 @@ export default function Signup() {
       confirmPassword: "",
     },
   });
+
+  const socialShopId = form.watch("shopId").trim();
 
   const onSubmit = async (data: SignupFormValues) => {
     setIsLoading(true);
@@ -171,6 +175,38 @@ export default function Signup() {
           <CardContent>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                {isClerkEnabled && (
+                  <>
+                    <div className="grid gap-3">
+                      <SignUpButton
+                        mode="redirect"
+                        fallbackRedirectUrl="/settings"
+                      >
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full"
+                          disabled={socialShopId.length < 3}
+                          onClick={() => {
+                            window.sessionStorage.setItem("ow_pending_clerk_shop_id", socialShopId);
+                          }}
+                        >
+                          Continue with Google, Apple, or Microsoft
+                        </Button>
+                      </SignUpButton>
+                      <p className="text-xs text-muted-foreground text-center">
+                        Enter your Shopify shop domain first so we can finish account setup after social sign-in.
+                      </p>
+                    </div>
+                    <div className="relative">
+                      <Separator className="my-4" />
+                      <span className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-xs uppercase tracking-wide text-muted-foreground bg-card w-fit px-2 mx-auto">
+                        Or create a password account
+                      </span>
+                    </div>
+                  </>
+                )}
+
                 <FormField
                   control={form.control}
                   name="email"

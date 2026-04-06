@@ -14,6 +14,7 @@ export const merchantsTable = pgTable("merchants", {
   id: text("id").primaryKey(),
   email: text("email").notNull().unique(),
   shopId: text("shop_id").notNull().unique(),
+  clerkUserId: text("clerk_user_id").unique(),
   passwordHash: text("password_hash"),
   apiKeyHash: text("api_key_hash"),
   apiKeyPrefix: text("api_key_prefix"),

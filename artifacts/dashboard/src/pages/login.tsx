@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { SignInButton } from "@clerk/clerk-react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { makeZodResolver } from "@/lib/zod-form-resolver";
@@ -8,6 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { LayoutDashboard, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -19,7 +21,7 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function Login() {
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, isClerkEnabled } = useAuth();
   const [, setLocation] = useLocation();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -85,6 +87,22 @@ export default function Login() {
           <CardContent>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+                {isClerkEnabled && (
+                  <>
+                    <div className="grid gap-3">
+                      <SignInButton mode="redirect" fallbackRedirectUrl="/settings" signUpForceRedirectUrl="/signup">
+                        <Button type="button" variant="outline" className="w-full">Continue with Google, Apple, or Microsoft</Button>
+                      </SignInButton>
+                    </div>
+                    <div className="relative">
+                      <Separator className="my-4" />
+                      <span className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-xs uppercase tracking-wide text-muted-foreground bg-card w-fit px-2 mx-auto">
+                        Or use email and password
+                      </span>
+                    </div>
+                  </>
+                )}
+
                 <FormField
                   control={form.control}
                   name="email"

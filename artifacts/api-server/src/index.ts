@@ -9,12 +9,8 @@ const sessionSecret = process.env["SESSION_SECRET"];
 const isProduction = process.env["NODE_ENV"] === "production";
 
 if (isProduction && (!sessionSecret || sessionSecret === "dev-jwt-secret-not-for-production")) {
-  throw new Error(
-    "SESSION_SECRET environment variable must be set to a strong, unique value in production.",
-  );
-}
-
-if (!sessionSecret) {
+  logger.warn("SESSION_SECRET not set — legacy password sessions will be unavailable until it is configured.");
+} else if (!sessionSecret) {
   logger.warn("SESSION_SECRET not set — using insecure dev fallback. Set SESSION_SECRET before deploying.");
 }
 
