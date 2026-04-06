@@ -24,6 +24,21 @@ export async function checkDatabaseHealth(): Promise<void> {
     logger.info({ tableCount }, "Database schema verified");
   } catch (err) {
     logger.error({ err }, "Database health check failed");
+
+    if (err instanceof Error) {
+      const message = err.message.toLowerCase();
+
+      if (message.includes("self-signed certificate") || message.includes("certificate")) {
+        throw new Error(
+          "Database SSL connection failed. For DigitalOcean Managed PostgreSQL, use a DATABASE_URL with sslmode=require and leave PG_SSL_VERIFY unset unless you are providing a trusted CA.",
+        );
+      }
+
+      if (message.includes("authentication failed") || message.includes("password authentication failed")) {
+        throw new Error("Database authentication failed. Verify the DATABASE_URL username, password, host, port, and database name from DigitalOcean Managed DB.");
+      }
+    }
+
     throw err;
   }
 }
