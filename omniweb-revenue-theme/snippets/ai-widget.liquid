@@ -15,7 +15,18 @@
   {%- liquid
     assign _currency = cart.currency.iso_code
     assign _locale   = request.locale.iso_code
-    assign _page     = template.name
+    assign _page_raw = template.name
+
+    comment
+      Normalize template names to consistent labels for the AI system prompt.
+      Shopify uses "index" for the homepage; normalize to "homepage" so the
+      backend can use a consistent enum.
+    endcomment
+    if _page_raw == 'index'
+      assign _page = 'homepage'
+    else
+      assign _page = _page_raw
+    endif
   -%}
 
   <script>
@@ -30,7 +41,7 @@
       };
 
       {% comment %}── Product page ──{% endcomment %}
-      {% if _page == 'product' %}
+      {% if _page_raw == 'product' %}
         ctx.product = {
           id:             {{ product.id | json }},
           title:          {{ product.title | json }},
@@ -55,14 +66,32 @@
             {%- endfor -%}
           ]
         };
-        {% if product.collections.first.handle %}
+
+        {% comment %}
+          Include up to 8 other products from the same collection so the AI can
+          recommend related items. All 9 slots are requested and the current product
+          may appear; the backend will filter it out by handle before rendering the
+          "Related Products" section in the system prompt.
+        {% endcomment %}
+        {% if product.collections.first %}
           ctx.collectionHandle = {{ product.collections.first.handle | json }};
           ctx.collectionTitle  = {{ product.collections.first.title | json }};
+          ctx.collectionProducts = [
+            {%- for p in product.collections.first.products limit: 9 -%}
+              {
+                "title":     {{ p.title | json }},
+                "handle":    {{ p.handle | json }},
+                "price":     {{ p.price | money_without_currency | json }},
+                "available": {{ p.available }},
+                "url":       {{ p.url | prepend: shop.url | json }}
+              }{%- unless forloop.last -%},{%- endunless -%}
+            {%- endfor -%}
+          ];
         {% endif %}
       {% endif %}
 
       {% comment %}── Collection page ──{% endcomment %}
-      {% if _page == 'collection' %}
+      {% if _page_raw == 'collection' %}
         ctx.collection = {
           title:         {{ collection.title | json }},
           handle:        {{ collection.handle | json }},
@@ -83,7 +112,7 @@
       {% endif %}
 
       {% comment %}── Cart page ──{% endcomment %}
-      {% if _page == 'cart' %}
+      {% if _page_raw == 'cart' %}
         ctx.cart = {
           itemCount:  {{ cart.item_count | json }},
           totalPrice: {{ cart.total_price | money | json }},
@@ -101,7 +130,7 @@
       {% endif %}
 
       {% comment %}── Search page ──{% endcomment %}
-      {% if _page == 'search' %}
+      {% if _page_raw == 'search' %}
         ctx.searchTerm = {{ search.terms | json }};
         ctx.searchResultCount = {{ search.results_count | json }};
       {% endif %}

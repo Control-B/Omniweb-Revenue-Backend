@@ -39,6 +39,8 @@ function formatPageContext(ctx: Record<string, unknown>): string {
 
   if (pageType === "product" && ctx.product && typeof ctx.product === "object") {
     const p = ctx.product as Record<string, unknown>;
+    const currentHandle = p.handle as string | undefined;
+
     lines.push("");
     lines.push("## Product Being Viewed");
     if (p.title)          lines.push(`Name: ${p.title}`);
@@ -63,7 +65,23 @@ function formatPageContext(ctx: Record<string, unknown>): string {
       lines.push(`Tags: ${(p.tags as string[]).join(", ")}`);
     }
     if (ctx.collectionTitle) lines.push(`Collection: ${ctx.collectionTitle}`);
-    if (ctx.collectionHandle) lines.push(`Collection Handle: ${ctx.collectionHandle}`);
+
+    /* Related products from the same collection — excludes the product being viewed */
+    const collectionProducts = ctx.collectionProducts as Array<Record<string, unknown>> | undefined;
+    if (collectionProducts && collectionProducts.length > 0) {
+      const related = collectionProducts.filter(
+        (cp) => !currentHandle || cp.handle !== currentHandle,
+      );
+      if (related.length > 0) {
+        const collName = (ctx.collectionTitle as string) || "the same collection";
+        lines.push(`\n## Related Products from ${collName}`);
+        lines.push("(You can recommend these as alternatives or complementary items)");
+        related.slice(0, 8).forEach((rp) => {
+          const avail = rp.available ? "in stock" : "sold out";
+          lines.push(`  • ${rp.title}: ${rp.price} ${currency} (${avail}) — ${rp.url}`.trim());
+        });
+      }
+    }
   }
 
   if (pageType === "collection" && ctx.collection && typeof ctx.collection === "object") {
