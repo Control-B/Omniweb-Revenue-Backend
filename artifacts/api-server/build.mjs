@@ -119,16 +119,7 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
     },
   });
 
-  // Widget bundle — browser IIFE, no Node deps
-  await esbuild({
-    entryPoints: [path.resolve(artifactDir, "src/widget/omniweb-widget.js")],
-    platform: "browser",
-    bundle: true,
-    format: "iife",
-    outfile: path.resolve(distDir, "widget.js"),
-    minify: true,
-    logLevel: "info",
-  });
+  // widget.js is a pre-built static file in public/widget.js — not compiled here
 }
 
 buildAll().catch((err) => {

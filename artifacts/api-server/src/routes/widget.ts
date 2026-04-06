@@ -4,7 +4,7 @@ import path from "node:path";
 
 const router: IRouter = Router();
 
-const widgetPath = path.join(__dirname, "widget.js");
+const widgetPath = path.join(__dirname, "..", "public", "widget.js");
 
 router.get("/widget.js", (_req: Request, res: Response) => {
   res.setHeader("Content-Type", "text/javascript; charset=utf-8");
