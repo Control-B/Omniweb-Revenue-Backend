@@ -23,7 +23,7 @@ export interface PublicWidgetConfig {
   voiceId: string;
 }
 
-const DEFAULT_CONFIG: Omit<WidgetConfig, "shopId"> = {
+export const DEFAULT_CONFIG: Omit<WidgetConfig, "shopId"> = {
   greeting: "Hi! 👋 I'm your AI sales assistant. How can I help you today?",
   persona:
     "You are a friendly, knowledgeable, and helpful AI sales assistant for an online store. You help shoppers find products, answer questions about products, pricing, shipping, and returns, and guide them toward making a purchase. Be concise, warm, and helpful. Never be pushy.",
@@ -87,16 +87,6 @@ export async function getWidgetConfig(shopId: string): Promise<WidgetConfig> {
     return rowToConfig(rows[0]);
   }
 
-  const isDemoShop = shopId === DEMO_SHOP_ID;
-
-  await ensureMerchantExists(shopId);
-
-  await db.insert(widgetConfigsTable).values({
-    shopId,
-    ...DEFAULT_CONFIG,
-    registeredAt: isDemoShop ? new Date() : null,
-  });
-
   return { shopId, ...DEFAULT_CONFIG };
 }
 
@@ -152,6 +142,18 @@ export async function getPublicWidgetConfig(shopId: string): Promise<PublicWidge
     enabled: config.enabled,
     voiceId: config.voiceId,
   };
+}
+
+export async function seedDemoShop(): Promise<void> {
+  await ensureMerchantExists(DEMO_SHOP_ID);
+  await db
+    .insert(widgetConfigsTable)
+    .values({
+      shopId: DEMO_SHOP_ID,
+      ...DEFAULT_CONFIG,
+      registeredAt: new Date(),
+    })
+    .onConflictDoNothing({ target: widgetConfigsTable.shopId });
 }
 
 export function getAvailableVoices(): Array<{ id: string; name: string; description: string }> {

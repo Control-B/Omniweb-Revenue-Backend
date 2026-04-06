@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { seedDemoShop } from "./lib/widget-config-store";
 
 const rawPort = process.env["PORT"];
 
@@ -14,6 +15,14 @@ const port = Number(rawPort);
 if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
+
+seedDemoShop()
+  .then(() => {
+    logger.info("Demo shop seeded");
+  })
+  .catch((err: unknown) => {
+    logger.warn({ err }, "Demo shop seed failed — continuing startup");
+  });
 
 app.listen(port, (err) => {
   if (err) {
