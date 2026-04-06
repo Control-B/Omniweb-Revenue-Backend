@@ -1,5 +1,6 @@
-import { db, widgetConfigsTable } from "@workspace/db";
+import { db, widgetConfigsTable, merchantsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { randomUUID } from "crypto";
 
 export interface WidgetConfig {
   shopId: string;
@@ -48,9 +49,26 @@ function rowToConfig(row: typeof widgetConfigsTable.$inferSelect): WidgetConfig 
   };
 }
 
+async function ensureMerchantExists(shopId: string): Promise<void> {
+  await db
+    .insert(merchantsTable)
+    .values({
+      id: randomUUID(),
+      email: `${shopId.replace(/[^a-z0-9]/gi, "-")}@placeholder.omniweb.dev`,
+      shopId,
+      plan: shopId === DEMO_SHOP_ID ? "pro" : "free",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .onConflictDoNothing({ target: merchantsTable.shopId });
+}
+
 export async function isShopRegistered(shopId: string): Promise<boolean> {
   const rows = await db
-    .select({ shopId: widgetConfigsTable.shopId, registeredAt: widgetConfigsTable.registeredAt })
+    .select({
+      shopId: widgetConfigsTable.shopId,
+      registeredAt: widgetConfigsTable.registeredAt,
+    })
     .from(widgetConfigsTable)
     .where(eq(widgetConfigsTable.shopId, shopId))
     .limit(1);
@@ -69,6 +87,9 @@ export async function getWidgetConfig(shopId: string): Promise<WidgetConfig> {
   }
 
   const isDemoShop = shopId === DEMO_SHOP_ID;
+
+  await ensureMerchantExists(shopId);
+
   await db.insert(widgetConfigsTable).values({
     shopId,
     ...DEFAULT_CONFIG,
@@ -84,6 +105,8 @@ export async function updateWidgetConfig(
 ): Promise<WidgetConfig> {
   const existing = await getWidgetConfig(shopId);
   const merged = { ...existing, ...updates };
+
+  await ensureMerchantExists(shopId);
 
   await db
     .insert(widgetConfigsTable)

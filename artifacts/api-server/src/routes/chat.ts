@@ -195,10 +195,10 @@ router.post("/chat", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const updatedSession = await getOrCreateSession(sessionId, shop);
+    const sessionForAI = await getOrCreateSession(sessionId, shop);
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",
-      messages: updatedSession.messages.map((m) => ({ role: m.role, content: m.content })),
+      messages: sessionForAI.messages.map((m) => ({ role: m.role, content: m.content })),
       max_tokens: 512,
     });
 
@@ -207,10 +207,11 @@ router.post("/chat", async (req: Request, res: Response): Promise<void> => {
     const assistantMsg: Message = { role: "assistant", content: reply };
     await addMessageToSession(sessionId, shop, assistantMsg);
 
+    const finalSession = await getOrCreateSession(sessionId, shop);
     res.json({
       reply,
       sessionId,
-      messageCount: updatedSession.messageCount + 1,
+      messageCount: finalSession.messageCount,
     });
   } catch (err) {
     logger.error({ err }, "Chat error");
