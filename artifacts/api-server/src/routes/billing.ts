@@ -7,17 +7,7 @@ import { logger } from "../lib/logger.js";
 
 const router: IRouter = Router();
 
-/**
- * Return a trusted base URL for Stripe success/cancel/portal return URLs.
- *
- * Priority:
- *   1. STRIPE_RETURN_URL env var — set this in production to your real domain
- *   2. REPLIT_DEV_DOMAIN env var — auto-set by Replit for dev environments
- *   3. Safe fallback pointing at the known dashboard path
- *
- * Never uses client-supplied headers (origin/referer) — those are user-
- * controlled and could enable open-redirect / phishing attacks.
- */
+// Uses server-side env vars only — never client-supplied headers (open-redirect risk)
 function getAppBaseUrl(): string {
   if (process.env["STRIPE_RETURN_URL"]) {
     return process.env["STRIPE_RETURN_URL"].replace(/\/$/, "");
@@ -375,17 +365,7 @@ async function handleStripeEvent(event: { type: string; data: { object: Record<s
   }
 }
 
-/**
- * Resolve a merchant's internal ID from subscription webhook data.
- *
- * Resolution strategy (in order of reliability):
- *   1. By existing stripeCustomerId in DB
- *   2. By existing stripeSubscriptionId in DB (handles re-sent events)
- *   3. By merchantId from subscription metadata (set during checkout)
- *
- * This also handles the first event after a checkout.session.completed
- * has already stored the customerId on the merchant.
- */
+// Resolve by customerId → subscriptionId → metadata.merchantId (in that order)
 async function resolveMerchantIdFromSubscription(
   subscriptionId: string,
   customerId: string,

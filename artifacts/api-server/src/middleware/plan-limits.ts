@@ -4,24 +4,9 @@ import { PLAN_NAMES } from "../lib/stripe.js";
 import { logger } from "../lib/logger.js";
 
 /**
- * Middleware enforcing active subscriptions and monthly message limits on
- * widget endpoints (/api/chat, /api/voice).
- *
- * Two independent gates — either can trigger a 402:
- *
- * 1. **Subscription gate** (paid plans only):
- *    If the merchant is on a paid plan (starter / pro) but their subscription
- *    status is NOT "active" or "trialing", return 402 immediately — even if
- *    they have 0 messages used this month.
- *
- * 2. **Usage gate** (all plans):
- *    If the merchant has consumed all messages in their effective monthly
- *    allowance (free plan = 50, starter = 500, pro = 5 000), return 402.
- *    The effective allowance is always the *free* tier when the subscription
- *    is inactive, so an inactive paid merchant gets both gates applied.
- *
- * The shopId is read from req.body.
- * If shopId is absent the request passes through (other middleware validates it).
+ * Enforces active subscriptions and monthly message limits on /api/chat and /api/voice.
+ * Passes through if shopId is absent or the merchant is not found (other middleware handles those).
+ * Fails closed (503) if the DB check itself errors.
  */
 export async function requirePlanLimits(
   req: Request,
@@ -36,17 +21,22 @@ export async function requirePlanLimits(
 
   try {
     const status = await checkUsage(shopId.slice(0, 200));
+
+    // Unknown merchant — let the route handler issue its own 403
+    if (!status.found) {
+      next();
+      return;
+    }
+
     const isPaidPlan = ["starter", "pro"].includes(status.plan);
     const isActiveSubscription = ["active", "trialing"].includes(status.subscriptionStatus);
 
-    // Gate 1: paid plan with inactive subscription → block immediately
+    // Gate 1: paid plan with inactive subscription
     if (isPaidPlan && !isActiveSubscription) {
       const planName = PLAN_NAMES[status.plan] ?? status.plan;
       res.status(402).json({
         error: "Subscription inactive",
-        message:
-          `Your ${planName} subscription is ${status.subscriptionStatus}. ` +
-          `Please renew or upgrade your subscription to continue using the AI widget.`,
+        message: `Your ${planName} subscription is ${status.subscriptionStatus}. Please renew to continue using the AI widget.`,
         plan: status.plan,
         effectivePlan: status.effectivePlan,
         subscriptionStatus: status.subscriptionStatus,
@@ -55,7 +45,7 @@ export async function requirePlanLimits(
       return;
     }
 
-    // Gate 2: usage limit exhausted
+    // Gate 2: usage limit reached
     if (!status.allowed) {
       const effectivePlanName = PLAN_NAMES[status.effectivePlan] ?? status.effectivePlan;
       res.status(402).json({
@@ -71,12 +61,10 @@ export async function requirePlanLimits(
       return;
     }
   } catch (err) {
-    // Fail closed: if the usage check itself errors (e.g. DB unavailable),
-    // block the request rather than allowing unbounded paid API consumption.
-    logger.error({ err, shopId: (req.body as { shopId?: string })?.shopId }, "Plan limit check failed — failing closed");
+    logger.error({ err, shopId }, "Plan limit check failed — failing closed");
     res.status(503).json({
       error: "Billing check unavailable",
-      message: "Unable to verify your plan limits right now. Please try again in a moment.",
+      message: "Unable to verify plan limits. Please try again in a moment.",
       retryable: true,
     });
     return;

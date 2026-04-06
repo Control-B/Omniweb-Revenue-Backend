@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { PLAN_LIMITS } from "./stripe.js";
 
 export interface UsageStatus {
+  found: boolean;
   allowed: boolean;
   plan: string;
   effectivePlan: string;
@@ -21,12 +22,8 @@ function getBillingPeriodStart(): Date {
   return new Date(now.getFullYear(), now.getMonth(), 1);
 }
 
-/**
- * Check whether a shop is within its plan's monthly message limit.
- * - If the subscription is not active/trialing, the free-tier limit applies
- *   regardless of the nominal plan (fail-safe downgrade).
- * - Resets the usage counter automatically if the billing period rolled over.
- */
+// Check plan limits; inactive subscriptions are downgraded to free-tier limits.
+// Returns found:false for unknown merchants so middleware can pass through.
 export async function checkUsage(shopId: string): Promise<UsageStatus> {
   const rows = await db
     .select({
@@ -41,15 +38,16 @@ export async function checkUsage(shopId: string): Promise<UsageStatus> {
     .limit(1);
 
   if (rows.length === 0) {
+    // Merchant not found — let the route handler return the appropriate 403
     return {
-      allowed: false,
+      found: false,
+      allowed: true,
       plan: "free",
       effectivePlan: "free",
       limit: PLAN_LIMITS["free"]!,
       used: 0,
       remaining: 0,
       subscriptionStatus: "none",
-      blockedReason: "over_limit",
     };
   }
 
@@ -81,6 +79,7 @@ export async function checkUsage(shopId: string): Promise<UsageStatus> {
   const allowed = used < limit;
 
   return {
+    found: true,
     allowed,
     plan,
     effectivePlan,
@@ -92,10 +91,7 @@ export async function checkUsage(shopId: string): Promise<UsageStatus> {
   };
 }
 
-/**
- * Increment the monthly message counter for a shop.
- * Resets automatically if we're in a new billing period.
- */
+// Increment monthly message counter; auto-resets on new billing period.
 export async function incrementUsage(shopId: string): Promise<void> {
   const rows = await db
     .select({
