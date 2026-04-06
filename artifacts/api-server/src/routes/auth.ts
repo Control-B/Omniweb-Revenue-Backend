@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { randomBytes, createHash } from "crypto";
+import { randomBytes } from "crypto";
 import bcrypt from "bcryptjs";
 import { db, merchantsTable } from "@workspace/db";
 import { eq, and, isNotNull } from "drizzle-orm";
@@ -9,8 +9,26 @@ import { logger } from "../lib/logger.js";
 
 const router: IRouter = Router();
 
+const IS_PROD = process.env["NODE_ENV"] === "production";
+const SESSION_COOKIE = "ow_session";
+const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+
 function generateApiKey(): string {
   return `ow_live_${randomBytes(32).toString("hex")}`;
+}
+
+function setSessionCookie(res: Response, token: string): void {
+  res.cookie(SESSION_COOKIE, token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: IS_PROD,
+    path: "/",
+    maxAge: COOKIE_MAX_AGE,
+  });
+}
+
+function clearSessionCookie(res: Response): void {
+  res.clearCookie(SESSION_COOKIE, { path: "/" });
 }
 
 router.post("/auth/signup", async (req: Request, res: Response): Promise<void> => {
@@ -105,10 +123,10 @@ router.post("/auth/signup", async (req: Request, res: Response): Promise<void> =
       email: normalizedEmail,
     });
 
+    setSessionCookie(res, token);
     logger.info({ shopId: normalizedShop }, "Merchant signed up");
 
     res.status(201).json({
-      token,
       apiKey,
       shopId: normalizedShop,
       email: normalizedEmail,
@@ -158,10 +176,10 @@ router.post("/auth/login", async (req: Request, res: Response): Promise<void> =>
       email: merchant.email,
     });
 
+    setSessionCookie(res, token);
     logger.info({ shopId: merchant.shopId }, "Merchant logged in");
 
     res.json({
-      token,
       shopId: merchant.shopId,
       email: merchant.email,
       plan: merchant.plan,
@@ -170,6 +188,11 @@ router.post("/auth/login", async (req: Request, res: Response): Promise<void> =>
     logger.error({ err }, "Login error");
     res.status(500).json({ error: "Login failed. Please try again." });
   }
+});
+
+router.post("/auth/logout", (_req: Request, res: Response): void => {
+  clearSessionCookie(res);
+  res.json({ message: "Logged out" });
 });
 
 router.get("/auth/me", requireSessionAuth, async (req: Request, res: Response): Promise<void> => {

@@ -1,8 +1,7 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useLocation } from "wouter";
 
 interface AuthState {
-  token: string;
   shopId: string;
   email: string;
   plan?: string;
@@ -13,10 +12,11 @@ interface AuthContextType {
   login: (state: AuthState) => void;
   logout: () => void;
   isAuthenticated: boolean;
-  credentials: { shopId: string; token: string } | null;
+  isLoading: boolean;
+  credentials: { shopId: string } | null;
 }
 
-const STORAGE_KEY = "ow_merchant_session";
+const STORAGE_KEY = "ow_merchant_ui";
 
 function readFromStorage(): AuthState | null {
   try {
@@ -31,7 +31,32 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [auth, setAuth] = useState<AuthState | null>(() => readFromStorage());
+  const [isLoading, setIsLoading] = useState(true);
   const [, setLocation] = useLocation();
+
+  /* On mount, verify the HttpOnly session cookie is still valid by hitting /api/auth/me.
+   * If the cookie is missing or expired, clear the local UI state. */
+  useEffect(() => {
+    const savedState = readFromStorage();
+    if (!savedState) {
+      setIsLoading(false);
+      return;
+    }
+
+    fetch("/api/auth/me", { credentials: "include" })
+      .then((res) => {
+        if (!res.ok) {
+          setAuth(null);
+          try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* noop */ }
+        }
+      })
+      .catch(() => {
+        // Network error — keep UI state optimistically, server will 401 on real requests
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+  }, []);
 
   const login = (state: AuthState) => {
     setAuth(state);
@@ -41,7 +66,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+    } catch {
+    }
     setAuth(null);
     try {
       sessionStorage.removeItem(STORAGE_KEY);
@@ -50,10 +79,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLocation("/");
   };
 
-  const credentials = auth ? { shopId: auth.shopId, token: auth.token } : null;
+  const credentials = auth ? { shopId: auth.shopId } : null;
 
   return (
-    <AuthContext.Provider value={{ auth, login, logout, isAuthenticated: !!auth, credentials }}>
+    <AuthContext.Provider value={{ auth, login, logout, isAuthenticated: !!auth, isLoading, credentials }}>
       {children}
     </AuthContext.Provider>
   );

@@ -17,7 +17,7 @@ declare global {
   }
 }
 
-function hashApiKey(key: string): string {
+export function hashApiKey(key: string): string {
   return createHash("sha256").update(key).digest("hex");
 }
 
@@ -50,13 +50,27 @@ function resolveFromJwt(token: string): Request["merchant"] | null {
   }
 }
 
+/**
+ * Admin auth: accepts Bearer JWT, HttpOnly session cookie, or x-widget-api-key header.
+ * Use for admin endpoints that widgets or external integrations may also call with an API key.
+ */
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers["authorization"];
   const apiKey = req.headers["x-widget-api-key"] as string | undefined;
+  const sessionCookie = (req.cookies as Record<string, string | undefined>)["ow_session"];
 
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.slice(7);
     const merchant = resolveFromJwt(token);
+    if (merchant) {
+      req.merchant = merchant;
+      next();
+      return;
+    }
+  }
+
+  if (sessionCookie) {
+    const merchant = resolveFromJwt(sessionCookie);
     if (merchant) {
       req.merchant = merchant;
       next();
@@ -73,16 +87,26 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     }
   }
 
-  res.status(401).json({ error: "Unauthorized", message: "Valid Authorization or x-widget-api-key header required" });
+  res.status(401).json({ error: "Unauthorized", message: "Valid Authorization, session cookie, or x-widget-api-key header required" });
 }
 
 /**
- * Session-only auth: accepts Bearer JWT only, never API keys.
- * Use for sensitive account-management endpoints where API key possession
- * must not be sufficient to modify account credentials.
+ * Session-only auth: accepts HttpOnly cookie or Bearer JWT — never API keys.
+ * Apply to sensitive account-management endpoints (profile, key rotation) where
+ * API key possession must not be sufficient to modify account credentials.
  */
 export function requireSessionAuth(req: Request, res: Response, next: NextFunction): void {
   const authHeader = req.headers["authorization"];
+  const sessionCookie = (req.cookies as Record<string, string | undefined>)["ow_session"];
+
+  if (sessionCookie) {
+    const merchant = resolveFromJwt(sessionCookie);
+    if (merchant) {
+      req.merchant = merchant;
+      next();
+      return;
+    }
+  }
 
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.slice(7);
@@ -94,7 +118,5 @@ export function requireSessionAuth(req: Request, res: Response, next: NextFuncti
     }
   }
 
-  res.status(401).json({ error: "Unauthorized", message: "Valid session token required" });
+  res.status(401).json({ error: "Unauthorized", message: "Valid session required" });
 }
-
-export { hashApiKey };

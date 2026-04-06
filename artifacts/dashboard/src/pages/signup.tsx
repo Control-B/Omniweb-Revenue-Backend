@@ -24,19 +24,24 @@ const signupSchema = z.object({
 
 type SignupFormValues = z.infer<typeof signupSchema>;
 
+interface PendingSession {
+  shopId: string;
+  email: string;
+  apiKey: string;
+}
+
 export default function Signup() {
   const { login, isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
   const [isLoading, setIsLoading] = useState(false);
-  const [newApiKey, setNewApiKey] = useState<string | null>(null);
-  const [pendingAuth, setPendingAuth] = useState<{ token: string; shopId: string; email: string } | null>(null);
+  const [pending, setPending] = useState<PendingSession | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    if (isAuthenticated && !newApiKey) {
+    if (isAuthenticated && !pending) {
       setLocation("/settings");
     }
-  }, [isAuthenticated, newApiKey, setLocation]);
+  }, [isAuthenticated, pending, setLocation]);
 
   const form = useForm<SignupFormValues>({
     resolver: makeZodResolver(signupSchema),
@@ -53,21 +58,20 @@ export default function Signup() {
     try {
       const res = await fetch("/api/auth/signup", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: data.email, shopId: data.shopId, password: data.password }),
       });
 
       const body = await res.json() as {
-        token?: string;
         apiKey?: string;
         shopId?: string;
         email?: string;
         error?: string;
       };
 
-      if (res.ok && body.token && body.apiKey) {
-        setPendingAuth({ token: body.token, shopId: body.shopId!, email: body.email! });
-        setNewApiKey(body.apiKey);
+      if (res.ok && body.apiKey && body.shopId) {
+        setPending({ apiKey: body.apiKey, shopId: body.shopId, email: body.email! });
       } else {
         toast.error("Signup Failed", {
           description: body.error ?? "Something went wrong. Please try again.",
@@ -83,14 +87,21 @@ export default function Signup() {
   };
 
   const copyApiKey = () => {
-    if (!newApiKey) return;
-    navigator.clipboard.writeText(newApiKey).then(() => {
+    if (!pending?.apiKey) return;
+    navigator.clipboard.writeText(pending.apiKey).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
   };
 
-  if (newApiKey) {
+  const continueToApp = () => {
+    if (pending) {
+      login({ shopId: pending.shopId, email: pending.email });
+    }
+    setLocation("/settings");
+  };
+
+  if (pending) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4">
         <div className="w-full max-w-md">
@@ -114,7 +125,7 @@ export default function Signup() {
             <CardContent className="pt-6">
               <div className="flex items-center gap-2">
                 <code className="flex-1 text-sm bg-muted rounded-md px-3 py-2.5 font-mono break-all select-all">
-                  {newApiKey}
+                  {pending.apiKey}
                 </code>
                 <Button
                   variant="outline"
@@ -131,12 +142,7 @@ export default function Signup() {
 
           <Button
             className="w-full"
-            onClick={() => {
-              if (pendingAuth) {
-                login(pendingAuth);
-              }
-              setLocation("/settings");
-            }}
+            onClick={continueToApp}
             data-testid="button-continue-to-dashboard"
           >
             Continue to Dashboard

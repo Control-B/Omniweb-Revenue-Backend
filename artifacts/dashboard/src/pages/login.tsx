@@ -42,14 +42,15 @@ export default function Login() {
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: data.email, password: data.password }),
       });
 
-      const body = await res.json() as { token?: string; shopId?: string; email?: string; plan?: string; error?: string };
+      const body = await res.json() as { shopId?: string; email?: string; plan?: string; error?: string };
 
-      if (res.ok && body.token) {
-        login({ token: body.token, shopId: body.shopId!, email: body.email!, plan: body.plan });
+      if (res.ok && body.shopId) {
+        login({ shopId: body.shopId, email: body.email!, plan: body.plan });
         setLocation("/settings");
       } else {
         toast.error("Authentication Failed", {
