@@ -21,8 +21,7 @@
     "jsonwebtoken": "^9.0.3",
     "openai": "^6.33.0",
     "pino": "^9",
-    "pino-http": "^10",
-    "stripe": "^22.0.0"
+    "pino-http": "^10"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",

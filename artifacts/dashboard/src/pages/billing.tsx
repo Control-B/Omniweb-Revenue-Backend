@@ -49,8 +49,8 @@ export default function Billing() {
 
   const handleUpgrade = async (plan: string) => {
     if (!billing?.stripeConfigured) {
-      toast.error("Stripe not configured", {
-        description: "The Stripe API key is not set up. Contact support to enable billing.",
+      toast.error("Billing unavailable", {
+        description: "Billing is currently disabled for this deployment. Contact support to re-enable upgrades.",
       });
       return;
     }
@@ -130,7 +130,7 @@ export default function Billing() {
         <Alert className="border-amber-400 bg-amber-50 dark:bg-amber-950/30">
           <AlertTriangle className="h-4 w-4 text-amber-600" />
           <AlertDescription className="text-amber-700 dark:text-amber-300">
-            Stripe is not configured for this deployment. Upgrade buttons are disabled.
+            Billing is currently disabled for this deployment. Upgrade buttons are unavailable.
           </AlertDescription>
         </Alert>
       )}

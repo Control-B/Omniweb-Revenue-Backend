@@ -1,6 +1,6 @@
 import { db, merchantsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { PLAN_LIMITS } from "./stripe.js";
+import { PLAN_LIMITS } from "./billing-config.js";
 
 export interface UsageStatus {
   found: boolean;

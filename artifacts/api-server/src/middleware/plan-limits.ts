@@ -1,6 +1,6 @@
 import { type Request, type Response, type NextFunction } from "express";
 import { checkUsage } from "../lib/plan-limits.js";
-import { PLAN_NAMES } from "../lib/stripe.js";
+import { PLAN_NAMES } from "../lib/billing-config.js";
 import { logger } from "../lib/logger.js";
 
 /**

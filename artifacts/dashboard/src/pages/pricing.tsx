@@ -77,7 +77,7 @@ const faqs = [
   },
   {
     q: "Can I change plans anytime?",
-    a: "Yes. You can upgrade or downgrade at any time from the Billing page. Stripe handles prorated charges automatically.",
+    a: "Yes. You can manage plan changes from the Billing page whenever billing is enabled for your deployment.",
   },
   {
     q: "What happens when I hit my message limit?",
