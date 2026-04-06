@@ -15,13 +15,20 @@ const MAX_SESSIONS = 1000;
 const SESSION_TTL_MS = 30 * 60 * 1000;
 const MAX_MESSAGES = 40;
 const TRIM_TO = 30;
+const PRUNE_INTERVAL_MS = 60 * 1000;
+
+let lastPruneAt = 0;
 
 function tenantKey(shopId: string, sessionId: string): string {
   return `${shopId}::${sessionId}`;
 }
 
 async function pruneExpiredSessions(): Promise<void> {
-  const cutoff = new Date(Date.now() - SESSION_TTL_MS);
+  const now = Date.now();
+  if (now - lastPruneAt < PRUNE_INTERVAL_MS) return;
+  lastPruneAt = now;
+
+  const cutoff = new Date(now - SESSION_TTL_MS);
   await db.delete(chatSessionsTable).where(lt(chatSessionsTable.lastActiveAt, cutoff));
 
   const allSessions = await db
@@ -37,30 +44,27 @@ async function pruneExpiredSessions(): Promise<void> {
   }
 }
 
-async function trimMessagesIfNeeded(key: string): Promise<void> {
-  const rows = await db
-    .select({ messages: chatSessionsTable.messages, messageCount: chatSessionsTable.messageCount })
-    .from(chatSessionsTable)
-    .where(eq(chatSessionsTable.sessionKey, key))
-    .limit(1);
-
-  if (rows.length === 0) return;
-  const messages = (rows[0].messages as Message[]) ?? [];
-  if (messages.length <= MAX_MESSAGES) return;
-
-  const systemMessages = messages.filter((m) => m.role === "system");
-  const nonSystem = messages.filter((m) => m.role !== "system");
-  const trimmed = [...systemMessages, ...nonSystem.slice(-TRIM_TO)];
-
-  await db
-    .update(chatSessionsTable)
-    .set({ messages: trimmed })
-    .where(eq(chatSessionsTable.sessionKey, key));
-}
-
 export async function getOrCreateSession(sessionId: string, shopId: string): Promise<Session> {
   await pruneExpiredSessions();
   const key = tenantKey(shopId, sessionId);
+  const now = new Date();
+
+  await db
+    .insert(chatSessionsTable)
+    .values({
+      sessionKey: key,
+      sessionId,
+      shopId,
+      messages: [],
+      messageCount: 0,
+      firstMessage: "",
+      lastActiveAt: now,
+      createdAt: now,
+    })
+    .onConflictDoUpdate({
+      target: chatSessionsTable.sessionKey,
+      set: { lastActiveAt: now },
+    });
 
   const rows = await db
     .select()
@@ -68,40 +72,13 @@ export async function getOrCreateSession(sessionId: string, shopId: string): Pro
     .where(eq(chatSessionsTable.sessionKey, key))
     .limit(1);
 
-  if (rows.length > 0) {
-    const row = rows[0];
-    const now = new Date();
-    await db
-      .update(chatSessionsTable)
-      .set({ lastActiveAt: now })
-      .where(eq(chatSessionsTable.sessionKey, key));
-    return {
-      messages: (row.messages as Message[]) ?? [],
-      shopId: row.shopId,
-      createdAt: row.createdAt,
-      lastActiveAt: now,
-      messageCount: row.messageCount,
-    };
-  }
-
-  const now = new Date();
-  await db.insert(chatSessionsTable).values({
-    sessionKey: key,
-    sessionId,
-    shopId,
-    messages: [],
-    messageCount: 0,
-    firstMessage: "",
-    lastActiveAt: now,
-    createdAt: now,
-  });
-
+  const row = rows[0]!;
   return {
-    messages: [],
-    shopId,
-    createdAt: now,
-    lastActiveAt: now,
-    messageCount: 0,
+    messages: (row.messages as Message[]) ?? [],
+    shopId: row.shopId,
+    createdAt: row.createdAt,
+    lastActiveAt: row.lastActiveAt,
+    messageCount: row.messageCount,
   };
 }
 
@@ -126,6 +103,27 @@ export async function updateSystemMessage(sessionId: string, shopId: string, con
   await db
     .update(chatSessionsTable)
     .set({ messages, lastActiveAt: new Date() })
+    .where(eq(chatSessionsTable.sessionKey, key));
+}
+
+async function trimMessagesIfNeeded(key: string): Promise<void> {
+  const rows = await db
+    .select({ messages: chatSessionsTable.messages })
+    .from(chatSessionsTable)
+    .where(eq(chatSessionsTable.sessionKey, key))
+    .limit(1);
+
+  if (rows.length === 0) return;
+  const messages = (rows[0].messages as Message[]) ?? [];
+  if (messages.length <= MAX_MESSAGES) return;
+
+  const systemMessages = messages.filter((m) => m.role === "system");
+  const nonSystem = messages.filter((m) => m.role !== "system");
+  const trimmed = [...systemMessages, ...nonSystem.slice(-TRIM_TO)];
+
+  await db
+    .update(chatSessionsTable)
+    .set({ messages: trimmed })
     .where(eq(chatSessionsTable.sessionKey, key));
 }
 
